@@ -1,4 +1,4 @@
-function [PHI, PHI_R, PHI_T, RHO] = flowSolve_comp(grid, flow, times)
+function [PHI, PHI_R, PHI_T, RHO, res] = flowSolve_comp(grid, flow, times)
 
 % Initilize Grid
 dr = grid.dr;
@@ -6,6 +6,7 @@ dT = grid.dT;
 dt = times.dt;
 RR = grid.RR;
 TT = grid.TT;
+alpha = times.alpha;
 
 % initalize grid count
 n_t = (times.stop - times.start)/dt;
@@ -13,23 +14,24 @@ n_t = (times.stop - times.start)/dt;
 
 % Initialize Values for flow field
 PHI = zeros(n_r, n_T, n_t);
-PHI(:,:,1) = RR.*cos(TT) + cos(TT)./RR;
+PHI(:,:,1) = RR.*cos(TT);
 PHI(:,:,2) = PHI(:,:,1);
 
 % Initialize flow field derivatives
 RHO = zeros(size(PHI));
 PHI_R = zeros(size(PHI));
 PHI_T = zeros(size(PHI));
-% PHI_t = zeros(size(PHI));
+[PHI_R(:,:,2), PHI_T(:,:,2), RHO(:,:,2)] = update_derivs(PHI, RR, TT, flow.M0, flow.gamma);
+
+
+% Initialize error checks
+res = zeros(1,n_t-2);
 
 % Begin iteration
 for n = 3:n_t % loop through time
     
-    % Update derivatives
-    [PHI_R(:,:,n-1), PHI_T(:,:,n-1), RHO(:,:,n-1)] = update_derivs(PHI, RR, TT, flow.M0, flow.gamma);
-    
     for i = 1:n_T % loop through theta        
-        for j = 2:(n_r-1) % loop through radius
+        for j = 1:(n_r-1) % loop through radius
             % 5 different control indexes for i and j directions            
             i0 = i;
             j0 = j;
@@ -71,24 +73,36 @@ for n = 3:n_t % loop through time
             % Apply Conditions for Time
             PHI(j0,i0,n) = ((0.5*alpha/dt - 1/dt^2)*PHI(j0,i0,n-2) + 2*PHI(j0,i0,n-1)/dt^2 + PHI_RR + PHI_TT)/(1/dt^2 + 0.5*alpha/dt);
         end
-        PHI(j,i,n) = PHI(j,i,n-1); % set the boundary condition
+        PHI(n_r,i,n) = PHI(n_r,i,n-1); % set the boundary condition
     end
+    
+    % Update derivatives
+    [PHI_R(:,:,n), PHI_T(:,:,n), RHO(:,:,n)] = update_derivs(PHI, RR, TT, flow.M0, flow.gamma);
+    
+    % Run Residual Check
+    difference = abs(PHI(:,:,n) - PHI(:,:,n-1));
+    res(n-2) = max(difference(:));
 end
 
 function [phi_r, phi_th, rho] = update_derivs(phi, rr, tt, M0, gam)
+    
+if ~exist('n', 'var')
+    n = 2;
+end
 
 % initialize temp vals for PHI_R, PHI_T, and rho
-phi_r = zeros(size(phi(:,:,n-1)));
-phi_th = zeros(size(phi(:,:,n-1)));
-rho = zeros(size(phi(:,:,n-1)));
+phi_r = zeros(size(phi(:,:,n)));
+phi_th = zeros(size(phi(:,:,n)));
+rho = zeros(size(phi(:,:,n)));
 % phi_t = zeros(size(rho));
 
     % Radial derivative
-    for jj = 2:n_r
-       phi_r(jj,:) =  (phi(jj,:,n-1)-phi(jj-1,:,n-1))./(rr(jj,:) - rr(jj-1,:));
+    for jj = 2:(n_r-1)
+       phi_r(jj,:) =  (phi(jj+1,:,n)-phi(jj-1,:,n))./(rr(jj+1,:) - rr(jj-1,:));
     end
 
     phi_r(1,:) = zeros(1,n_T);
+    phi_r(end,:) = (phi(end,:,n)-phi(end-1,:,n))./(rr(end,:) - rr(end-1,:));
 
     % Angular derivative
     for ii = 1:n_T
@@ -104,11 +118,11 @@ rho = zeros(size(phi(:,:,n-1)));
             ii_1 = ii-1;
         end 
 
-        phi_th(:,ii0,n-1) =  (1/rr(:,ii0))*0.5*(phi(:,ii1,n)-phi(:,ii_1,n))./(tt(:,ii1) - tt(:,ii_1));
+        phi_th(:,ii0) =  (1./rr(:,ii0)).*(phi(:,ii1,n)-phi(:,ii_1,n))./(tt(:,ii1) - tt(:,ii_1));        
     end
 
     % Time Derivative
-    phi_t = (phi(:,:,n-1) - phi(:,:,n-2))/dt;
+    phi_t = (phi(:,:,n) - phi(:,:,n-1))/dt;
 
     % Local speed of sound
     a2_ij = (2/(M0^2) - (gam - 1).*(phi_r.^2 + (phi_th./rr).^2 - 1));
