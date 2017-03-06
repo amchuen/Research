@@ -87,7 +87,7 @@ for n = 3:n_t % loop through time
             end
 
             % Apply Conditions for Time
-            PHI(j0,i0,n) = ((0.5*alpha/dt - 1/(dt^2))*PHI(j0,i0,n-2) + 2/(dt^2)*PHI(j0,i0,n-1) + PHI_RR + PHI_TT)/(1/dt^2 + 0.5*alpha/dt);
+            PHI(j0,i0,n) = ((0.5*alpha/dt - 1/(dt^2))*PHI(j0,i0,n-2) + 2/(dt^2)*PHI(j0,i0,n-1) + PHI_RR + PHI_TT)/(1/dt^2 + 0.5*alpha/dt); % add viscosity term from divergence of density;
         end
     end
     PHI(n_r,:,n) = PHI_BC; %PHI(n_r,i,n-1); % set the farfield boundary condition

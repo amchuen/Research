@@ -37,7 +37,7 @@ run.grid.YY = run.grid.RR .* sin(run.grid.TT);
 % Initialize flow properties
 run.flow.gamma = 1.4;
 run.flow.PHI_INIT = run.grid.XX; 
-M0 = [0.0, 0.2, 0.3, 0.4];
+M0 = [0.0, 0.2, 0.3, 0.35];
 
 %% Loop and Solve for Convergence w/ Time
 
