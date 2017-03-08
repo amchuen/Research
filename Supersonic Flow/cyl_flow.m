@@ -37,7 +37,7 @@ run.grid.YY = run.grid.RR .* sin(run.grid.TT);
 % Initialize flow properties
 run.flow.gamma = 1.4;
 run.flow.PHI_INIT = run.grid.XX; 
-M0 = [0.0, 0.2, 0.3, 0.35];
+M0 = [0.4]; % , 0.3, 0.35
 
 %% Loop and Solve for Convergence w/ Time
 
@@ -57,12 +57,12 @@ for nn = 1:length(M0)
        run(nn).flow.PHI_INIT = run(nn-1).sol.PHI(:,:,end); 
     end
     run(nn).times.dt = dt;
-    run(nn).times.alpha = 5*1.5;%10/dt(nn);
+    run(nn).times.alpha = 0.0;%5*1.5;%10/dt(nn);
     run(nn).times.stop = 202 * dt;
 
     % Run Solver
-    [run(nn).sol.PHI, run(nn).sol.PHI_R, run(nn).sol.PHI_T, run(nn).sol.RHO, run(nn).sol.res] = flowSolve_comp(run(nn).grid, run(nn).flow, run(nn).times);
-    fprintf('Residual: %0.5f\n', log(run(nn).sol.res(end)));
+    [run(nn).sol.PHI, run(nn).sol.PHI_R, run(nn).sol.PHI_T, run(nn).sol.RHO, run(nn).sol.res, ind, x_res, y_res] = flowSolve_comp(run(nn).grid, run(nn).flow, run(nn).times);
+    fprintf('Residual: %0.5f\n', run(nn).sol.res(end));
     fprintf('Simulation %i Complete...\n', nn);
     
     % Plot Residuals
@@ -93,6 +93,15 @@ for nn = 1:length(M0)
     hold on;
     plot(run(nn).grid.TT(1,:), run(nn).sol.PHI_T(1,:,end));
     hold off;
+    
+    figure();
+    hold on;
+    for i = 1:length(x_res)
+        plot(run.grid.XX(y_res(i), x_res(i)), run.grid.YY(y_res(i), x_res(i)), 'o');
+        hold on;
+    end
+    axis equal;
+    title('Residual Location');
 end
 
 

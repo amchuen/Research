@@ -1,4 +1,4 @@
-function [PHI, PHI_R, PHI_T, RHO, res] = flowSolve_comp(grid, flow, times)
+function [PHI, PHI_R, PHI_T, RHO, res, ind, x_res, y_res] = flowSolve_comp(grid, flow, times)
 
 % Initilize Grid
 dr = grid.dr;
@@ -26,10 +26,14 @@ RHO = zeros(size(PHI));
 PHI_R = zeros(size(PHI));
 PHI_T = zeros(size(PHI));
 [PHI_R(:,:,2), PHI_T(:,:,2), RHO(:,:,2)] = update_rho(PHI, RR, flow.M0, flow.gamma);
+e_visc = -0.001;
 
 
 % Initialize error checks
 res = zeros(1,n_t-2);
+x_res = res;
+y_res = res;
+ind = res;
 
 % Begin iteration
 for n = 3:n_t % loop through time
@@ -74,9 +78,13 @@ for n = 3:n_t % loop through time
                fprintf('WARNING: DENISTY IS NOT UNITY AT ITER %i, %i, %i\n', n, i, j);  
             end
             
-            % Second Order Derivatives
+            % Divergence of Field
             PHI_TT = (1/RR(j0,i0)^2)*(1/dT)*(RHO_i1*(PHI(j0,i1,n-1)-PHI(j0,i0,n-1))/dT - RHO_i0*(PHI(j0,i0,n-1)-PHI(j0,i_1,n-1))/dT);
             PHI_RR = (1/RR(j0,i0))*(RHO_j1*0.5*(RR(j1,i0) + RR(j0,i0))*(PHI(j1,i0,n-1) - PHI(j0,i0,n-1))/dr - RHO_j0*0.5*(RR(j_1,i0) + RR(j0,i0))*(PHI(j0,i0,n-1) - PHI(j_1,i0,n-1))/dr)/dr;
+            
+            % Divergence of Density
+            RHO_TT = (1/RR(j0,i0)^2)*(1/dT^2)*(RHO(j0,i1,n-1) - 2*RHO(j0,i0,n-1)+RHO(j0,i_1,n-1));
+            RHO_RR = (1/RR(j0,i0))*(0.5*(RR(j1,i0) + RR(j0,i0))*(RHO(j1,i0,n-1) - RHO(j0,i0,n-1))/dr - 0.5*(RR(j_1,i0) + RR(j0,i0))*(RHO(j0,i0,n-1) - RHO(j_1,i0,n-1))/dr)/dr;
             
             if (j == 1) && (PHI(j1,i0) ~= PHI(j_1,i0))
                fprintf('Neumann Condition not applied for radius!\n'); 
@@ -86,8 +94,8 @@ for n = 3:n_t % loop through time
                fprintf('Neumann Condition not applied for THETA!\n'); 
             end
 
-            % Apply Conditions for Time
-            PHI(j0,i0,n) = ((0.5*alpha/dt - 1/(dt^2))*PHI(j0,i0,n-2) + 2/(dt^2)*PHI(j0,i0,n-1) + PHI_RR + PHI_TT)/(1/dt^2 + 0.5*alpha/dt); % add viscosity term from divergence of density;
+            % Apply Conditions for Time ...add viscosity term from divergence of density
+            PHI(j0,i0,n) = ((0.5*alpha/dt - 1/(dt^2))*PHI(j0,i0,n-2) + 2/(dt^2)*PHI(j0,i0,n-1) + PHI_RR + PHI_TT + e_visc.*(RHO_RR + RHO_TT))/(1/dt^2 + 0.5*alpha/dt);
         end
     end
     PHI(n_r,:,n) = PHI_BC; %PHI(n_r,i,n-1); % set the farfield boundary condition
@@ -97,7 +105,10 @@ for n = 3:n_t % loop through time
     
     % Run Residual Check
     difference = abs(PHI(:,:,n) - PHI(:,:,n-1));
-    res(n-2) = max(difference(:));
+    [res(n-2), ind(n-2)] = max(difference(:));
+    [yy, xx] = ind2sub(size(difference), ind(n-2));
+    y_res(n-2) = yy;
+    x_res(n-2) = xx;
 end
 
 function [phi_r, phi_th, rho] = update_rho(phi, rr, M0, gam)
@@ -152,7 +163,7 @@ function [phi_r, phi_th, rho] = update_rho(phi, rr, M0, gam)
         else
             ii_1 = ii-1;
         end
-        for jj = 2:n_r % Loop through Radii
+        for jj = 2:(n_r-1) % Loop through Radii
             rho(jj,ii0) = rho_bar(jj, ii0) - eps(jj, ii0)*(phi_th(jj, ii0)*(rho_bar(jj,ii0) - rho_bar(jj,ii_1)) + phi_r(jj,ii0)*(rho_bar(jj,ii0) - rho_bar(jj-1, ii0)));
             if rho(jj,ii0) < 0
                 rho(jj,ii0) = 0;
@@ -163,6 +174,8 @@ function [phi_r, phi_th, rho] = update_rho(phi, rr, M0, gam)
         if rho(1,ii0) < 0
             rho(1,ii0) = 0;
         end
+        
+        rho(n_r, ii0) = 1;
     end
 end
 
