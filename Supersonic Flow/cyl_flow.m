@@ -39,7 +39,7 @@ run.grid.YY = run.grid.RR .* sin(run.grid.TT);
 % Initialize flow properties
 run.flow.gamma = 1.4;
 run.flow.PHI_INIT = run.grid.XX; 
-M0 = [0.55];%, 0.4, 0.55]; % , 0.3, 0.35
+M0 = [0.0, 0.3, 0.55];%, 0.4, 0.55]; % , 0.3, 0.35
 
 %% Loop and Solve for Convergence w/ Time
 
@@ -97,15 +97,17 @@ for nn = 1:length(M0)
         colorbar('eastoutside');
         
         figure();
-        contourf(run(nn).grid.XX, run(nn).grid.YY, run(nn).sol.M_IJ(:,:,end), 150);
+        contourf(run(nn).grid.XX, run(nn).grid.YY, run(nn).sol.M_IJ(:,:,end), 50);
         title(sprintf('Mach Number (Sim %i)', nn));
         colorbar('eastoutside');
     end
     figure(theta);
     hold on;
-    plot(run(nn).grid.TT(1,:)*180/pi, run(nn).sol.PHI_T(1,:,end));
+    h(nn) = plot(run(nn).grid.TT(1,:)*180/pi, run(nn).sol.PHI_T(1,:,end));
+    s{nn} = sprintf('Mach %0.2f', M0(nn));
     xlabel('\theta');
     ylabel('\phi_{\theta}');
+    set(gca, 'Xdir', 'reverse');
     hold off;
     
     figure();
@@ -118,6 +120,8 @@ for nn = 1:length(M0)
     title('Residual Location');
 end
 
+figure(theta);
+legend(h, s);
 
 
 
