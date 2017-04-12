@@ -31,13 +31,16 @@ M_IJ = zeros(size(PHI));
 
 
 % Initialize error checks
-res = zeros(1,n_t-2);
+res = ones(1,2);
 x_res = res;
 y_res = res;
 ind = res;
+n = 2;
 
 % Begin iteration
-for n = 3:n_t % loop through time
+% for n = 3:n_t % loop through time
+while res(n) > times.tol
+    n = n+1;
 %     if (mean2(RHO(:,:,n-1)) ~= 1)
 %        fprintf('Warning: density is not unity!\n'); 
 %     end
@@ -75,25 +78,20 @@ for n = 3:n_t % loop through time
             RHO_j1 = 0.5*(RHO(j1, i0,n-1) + RHO(j0,i0,n-1));
             RHO_j0 = 0.5*(RHO(j_1, i0,n-1) + RHO(j0,i0,n-1));
             
+            % Radius Averages
+            RR_i1 = 0.5*(RR(j0,i1) + RR(j0,i0));
+            RR_i0 = 0.5*(RR(j0,i_1) + RR(j0,i0));
+            RR_j1 = 0.5*(RR(j1, i0) + RR(j0,i0));
+            RR_j0 = 0.5*(RR(j_1, i0) + RR(j0,i0));
+            
             if (flow.M0 == 0) && ((RHO_i1 ~= 1) || (RHO_i0 ~= 1) || (RHO_j1 ~= 1) || (RHO_j0 ~= 1) )
                fprintf('WARNING: DENISTY IS NOT UNITY AT ITER %i, %i, %i\n', n, i, j);  
             end
             
             % Divergence of Field
             PHI_TT = (1/RR(j0,i0)^2)*(1/dT)*(RHO_i1*(PHI(j0,i1,n-1)-PHI(j0,i0,n-1))/dT - RHO_i0*(PHI(j0,i0,n-1)-PHI(j0,i_1,n-1))/dT);
-            PHI_RR = (1/RR(j0,i0))*(RHO_j1*0.5*(RR(j1,i0) + RR(j0,i0))*(PHI(j1,i0,n-1) - PHI(j0,i0,n-1))/dr - RHO_j0*0.5*(RR(j_1,i0) + RR(j0,i0))*(PHI(j0,i0,n-1) - PHI(j_1,i0,n-1))/dr)/dr;
-            
-            % Divergence of Density
-%             RHO_TT = (1/RR(j0,i0)^2)*(1/dT^2)*(RHO(j0,i1,n-1) - 2*RHO(j0,i0,n-1)+RHO(j0,i_1,n-1));
-%             RHO_RR = (1/RR(j0,i0))*(0.5*(RR(j1,i0) + RR(j0,i0))*(RHO(j1,i0,n-1) - RHO(j0,i0,n-1))/dr - 0.5*(RR(j_1,i0) + RR(j0,i0))*(RHO(j0,i0,n-1) - RHO(j_1,i0,n-1))/dr)/dr;
-
-            % Local viscosity in PHI at top of cylinder
-%             if (TT(j0, i0)*180/pi >= 45) || (TT(j0, i0)*180/pi <= 135)
-%                 e_visc = 0.5*1.25e-7;
-%             else
-%                 e_visc = 0.0;
-%             end
-            
+            PHI_RR = (1/RR(j0,i0))*(RHO_j1*RR_j1*(PHI(j1,i0,n-1) - PHI(j0,i0,n-1))/dr - RHO_j0*RR_j0*(PHI(j0,i0,n-1) - PHI(j_1,i0,n-1))/dr)/dr;
+                       
             if (j == 1) && (PHI(j1,i0) ~= PHI(j_1,i0))
                fprintf('Neumann Condition not applied for radius!\n'); 
             end
@@ -104,11 +102,9 @@ for n = 3:n_t % loop through time
             
             if ~isreal([PHI_TT, PHI_RR])%, RHO_TT, RHO_RR])
                 fprintf('Complex Result! Please check results and mesh!\n');
-%                 dbstop in flowSolve_comp
             end
 
             % Apply Conditions for Time ...add viscosity term from divergence of density
-%             PHI(j0,i0,n) = ((0.5*alpha/dt - 1/(dt^2))*PHI(j0,i0,n-2) + 2/(dt^2)*PHI(j0,i0,n-1) + PHI_RR + PHI_TT)/(1/dt^2 + 0.5*alpha/dt);
             if (TT(j0, i0)*180/pi >= 45) && (TT(j0, i0)*180/pi <= 135)
                 
                 if flow.visc == 1
@@ -139,10 +135,10 @@ for n = 3:n_t % loop through time
     
     % Run Residual Check
     difference = abs(PHI(:,:,n) - PHI(:,:,n-1));
-    [res(n-2), ind(n-2)] = max(difference(:));
+    [res(n), ind(n)] = max(difference(:));
     [yy, xx] = ind2sub(size(difference), ind(n-2));
-    y_res(n-2) = yy;
-    x_res(n-2) = xx;
+    y_res(n) = yy;
+    x_res(n) = xx;
 end
 
 function [phi_r, phi_th, rho, M_ij] = update_rho(phi, rr, M0, gam)
@@ -155,7 +151,6 @@ function [phi_r, phi_th, rho, M_ij] = update_rho(phi, rr, M0, gam)
     phi_r = zeros(size(phi(:,:,n)));
     phi_th = zeros(size(phi(:,:,n)));
     rho = ones(size(phi(:,:,n)));
-    % phi_t = zeros(size(rho));
 
     % Radial gradient
     for jj = 2:(n_r-1)
@@ -190,7 +185,6 @@ function [phi_r, phi_th, rho, M_ij] = update_rho(phi, rr, M0, gam)
     phi_t = (phi(:,:,n) - phi(:,:,n-1))/dt;
 
     % Local speed of sound
-%     a2_ij = (2/(M0^2) - (gam - 1).*(phi_r.^2 + (phi_th./rr).^2 - 1));
 %     a2_ij = (gam - 1).*(0.5 + 1./((gam-1)*M0^2) - 0.5.*(phi_r.^2 + (phi_th./rr).^2));
     a2_ij = (1/(M0^2) - 0.5*(gam - 1).*(phi_r.^2 + (phi_th./rr).^2 -1));
 
@@ -203,9 +197,7 @@ function [phi_r, phi_th, rho, M_ij] = update_rho(phi, rr, M0, gam)
 %     eps = 0.02*ones(size(M_ij));%max(zeros(size(M_ij)), 1 - 0.9./(M0^2 .* ones(size(M_ij))));
 
     % Local density calculations
-%     rho_bar = (1 + 0.5.*(gam-1).*M0^2.*(phi_r.^2 + (phi_th./rr).^2 + 2*phi_t)).^(-1/(gam-1));
     rho_bar = (1 - 0.5.*(gam-1).*M0^2.*(phi_r.^2 + (phi_th./rr).^2 + 2*phi_t - 1)).^(1/(gam-1));
-%     rho_bar(1,:) = ones(size(rho_bar(1,:)));
 
     for ii = 1:n_T % loop through Thetas
         ii0 = ii;
@@ -220,19 +212,16 @@ function [phi_r, phi_th, rho, M_ij] = update_rho(phi, rr, M0, gam)
             ii1 = ii0 + 1;
         end
         for jj = 2:(n_r-1) % Loop through Radii
-%             rho(jj,ii0) = rho_bar(jj, ii0) - eps(jj, ii0)*(phi_th(jj, ii0)*(rho_bar(jj,ii0) - rho_bar(jj,ii_1)) + phi_r(jj,ii0)*(rho_bar(jj,ii0) - rho_bar(jj-1, ii0)));
-            rho(jj, ii0) = rho_bar(jj, ii0) - eps(jj, ii0)*(phi_th(jj,ii0)/rr(jj,ii0) * (rho_bar(jj, ii0) - rho_bar(jj, ii1))/dT + phi_r(jj, ii0) * (rho_bar(jj+1, ii0) - rho_bar(jj, ii0))/dr);
+            rho(jj,ii0) = rho_bar(jj, ii0) - eps(jj, ii0)*(phi_th(jj, ii0)*(rho_bar(jj,ii0) - rho_bar(jj,ii_1)) + phi_r(jj,ii0)*(rho_bar(jj,ii0) - rho_bar(jj-1, ii0)));
+%             rho(jj, ii0) = rho_bar(jj, ii0) - eps(jj, ii0)*(phi_th(jj,ii0)/rr(jj,ii0) * (rho_bar(jj, ii0) - rho_bar(jj, ii1))/dT + phi_r(jj, ii0) * (rho_bar(jj+1, ii0) - rho_bar(jj, ii0))/dr);
             if ~isreal(rho(jj, ii0))
                 fprintf('Imaginary value detected for density!\n');
             end
-            
-%             if (rho(jj,ii0) < 0) || (~isreal(rho(jj,ii0)))
-%                 rho(jj,ii0) = 0;
-%             end
+
         end
 
-%         rho(1,ii0) = rho_bar(1,ii0) - eps(1,ii0) * (phi_th(1,ii0) * (rho_bar(1,ii0) - rho_bar(1, ii_1))); % all PHI_R's at surface are zero
-        rho(1, ii0) = rho_bar(1, ii0) - eps(1, ii0)*(phi_th(1,ii0)/rr(1,ii0) * (rho_bar(1, ii_1) - rho_bar(1, ii0))/dT);
+        rho(1,ii0) = rho_bar(1,ii0) - eps(1,ii0) * (phi_th(1,ii0) * (rho_bar(1,ii0) - rho_bar(1, ii_1))); % all PHI_R's at surface are zero
+%         rho(1, ii0) = rho_bar(1, ii0) - eps(1, ii0)*(phi_th(1,ii0)/rr(1,ii0) * (rho_bar(1, ii_1) - rho_bar(1, ii0))/dT);
         if ~isreal(rho(1, ii0))
             fprintf('Imaginary value detected for density!\n');
         end

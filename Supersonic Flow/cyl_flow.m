@@ -13,7 +13,7 @@ alpha = 2.5;
 
 % Cylinder Dimensions
 r_cyl = 1.0;
-r_max = 8;
+r_max = 10;
 
 % Field Axis Values
 r_vals = r_cyl:dr:(r_max+dr);
@@ -39,7 +39,7 @@ run.grid.YY = run.grid.RR .* sin(run.grid.TT);
 % Initialize flow properties
 run.flow.gamma = 1.4;
 run.flow.PHI_INIT = run.grid.XX; 
-M0 = [0.0, 0.3, 0.55];%, 0.4, 0.55]; % , 0.3, 0.35
+M0 = [0, 0.4, 0.6]; % , 0.3, 0.35
 
 %% Loop and Solve for Convergence w/ Time
 
@@ -56,13 +56,14 @@ for nn = 1:length(M0)
     end
     
     run(nn).flow.M0 = M0(nn);
-    run(nn).flow.visc = 1;
+    run(nn).flow.visc = 0.0;
 %     if nn > 1
 %        run(nn).flow.PHI_INIT = run(nn-1).sol.PHI(:,:,end); 
 %     end
     run(nn).times.dt = dt;
     run(nn).times.alpha = alpha;%10/dt(nn);
-    run(nn).times.stop = 302 * dt;
+    run(nn).times.stop = 200 * dt;
+    run(nn).times.tol = 1.0e-3;
 
     % Run Solver
 %     dbstop in flowSolve_comp if ~isreal([PHI_TT, PHI_RR, RHO_TT, RHO_RR])
@@ -73,13 +74,15 @@ for nn = 1:length(M0)
     % Plot Residuals
     figure(resCheck);
     hold on;
-    plot((0:1:((run(nn).times.stop - run(nn).times.start)/run(nn).times.dt - 3)), log10(run(nn).sol.res));
+    plot(1:length(run(nn).sol.res), log10(run(nn).sol.res));
     hold off;
     
     if show_field == 1
         % Plot Fields
-        PHI_X = run(nn).sol.PHI_R(:,:,end).*cos(run(nn).grid.TT) - run(nn).sol.PHI_T(:,:,end).*sin(run(nn).grid.TT);
-        PHI_Y = run(nn).sol.PHI_R(:,:,end).*sin(run(nn).grid.TT) + run(nn).sol.PHI_T(:,:,end).*cos(run(nn).grid.TT);
+        PHI_X = run(nn).sol.PHI_R(:,:,end).*cos(run(nn).grid.TT) - run(nn).sol.PHI_T(:,:,end).*sin(run(nn).grid.TT)./run(nn).grid.RR;
+        PHI_Y = run(nn).sol.PHI_R(:,:,end).*sin(run(nn).grid.TT) + run(nn).sol.PHI_T(:,:,end).*cos(run(nn).grid.TT)./run(nn).grid.RR;
+        V2_TOT = PHI_X.^2 + PHI_Y.^2;
+        Cp = 1 - V2_TOT;
         figure(); % cp plots
         contourf(run(nn).grid.XX, run(nn).grid.YY, 1-(PHI_X.^2 + PHI_Y.^2), 50); %./((RR.*cos(TT)).^2)
         title(sprintf('Pressure Coefficient Contours (Sim %i)', nn));
@@ -103,10 +106,13 @@ for nn = 1:length(M0)
     end
     figure(theta);
     hold on;
-    h(nn) = plot(run(nn).grid.TT(1,:)*180/pi, run(nn).sol.PHI_T(1,:,end));
+%     h(nn) = plot(run(nn).grid.TT(1,:), run(nn).sol.PHI_T(1,:,end));
+    h(nn) = plot(run(nn).grid.TT(1,:), Cp(1,:));
     s{nn} = sprintf('Mach %0.2f', M0(nn));
     xlabel('\theta');
-    ylabel('\phi_{\theta}');
+%     ylabel('\phi_{\theta}');
+    ylabel('C_p');
+    title('C_p on surface of Cylinder');
     set(gca, 'Xdir', 'reverse');
     hold off;
     
@@ -122,6 +128,7 @@ end
 
 figure(theta);
 legend(h, s);
+% axis equal
 
 
 
