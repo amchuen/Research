@@ -157,7 +157,7 @@ function [phi_r, phi_th, rho, M_ij] = update_rho(phi, rr, M0, gam)
     rho = ones(size(phi(:,:,n)));
     % phi_t = zeros(size(rho));
 
-    % Radial derivative
+    % Radial gradient
     for jj = 2:(n_r-1)
        phi_r(jj,:) =  (phi(jj+1,:,n)-phi(jj-1,:,n))./(2*dr); % central finite difference
        
@@ -191,11 +191,13 @@ function [phi_r, phi_th, rho, M_ij] = update_rho(phi, rr, M0, gam)
 
     % Local speed of sound
 %     a2_ij = (2/(M0^2) - (gam - 1).*(phi_r.^2 + (phi_th./rr).^2 - 1));
-    a2_ij = (gam - 1).*(0.5 + 1./((gam-1)*M0^2) - 0.5.*(phi_r.^2 + (phi_th./rr).^2));
+%     a2_ij = (gam - 1).*(0.5 + 1./((gam-1)*M0^2) - 0.5.*(phi_r.^2 + (phi_th./rr).^2));
+    a2_ij = (1/(M0^2) - 0.5*(gam - 1).*(phi_r.^2 + (phi_th./rr).^2 -1));
 
     % Local Mach number & artificial viscosity
-    M2_ij = (((phi_th./rr).^2 + phi_r.^2)./a2_ij);
-    M_ij = M2_ij.^2;
+    q2_ij = ((phi_th./rr).^2 + phi_r.^2);
+    M2_ij = q2_ij./a2_ij;
+    M_ij = M2_ij.^0.5;
 %     eps = max(zeros(size(M2_ij)), 1 - 0.9./(M2_ij));
     eps = zeros(size(M2_ij));
 %     eps = 0.02*ones(size(M_ij));%max(zeros(size(M_ij)), 1 - 0.9./(M0^2 .* ones(size(M_ij))));
