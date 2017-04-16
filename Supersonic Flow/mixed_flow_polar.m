@@ -9,7 +9,7 @@ dr = 0.1;
 dT = 0.01*pi;
 dt = 0.1*dr;
 
-alpha = 0.05;
+alpha = 5.0;
 
 % Cylinder Dimensions
 r_cyl = 1.0;
@@ -31,16 +31,19 @@ YY = RR .* sin(TT);
 
 % Fluid Params
 gam = 1.4; % heat 
-M0 = 0.01;
+M0 = 0.52;
 visc = 0.0;
 
 %% FIELD VARIABLE INITIALIZATION
 
-PHI = zeros([size(RR), 2]);
+PHI = ones([size(RR), 2]);
+PHI(:,:,1) = XX;
+PHI(:,:,2) = PHI(:,:,1);
+[n_r, n_T] = size(RR);
 res = 1;
 ind = 0;
 iter = 1.0;
-tol = 1e-3;
+tol = 1e-4;
 
 BC.dirichlet.Vr_II = cos(TT(end,:)).*(1 - (r_cyl^2)./(RR(end,:).^2));
 BC.dirichlet.PHI_II = (RR(end,:) + (r_cyl^2)./(RR(end,:))).*cos(TT(end,:));
@@ -50,66 +53,144 @@ BC.dirichlet.PHI_II = (RR(end,:) + (r_cyl^2)./(RR(end,:))).*cos(TT(end,:));
 while res(end) > tol % iterate through time
     
     % Initialize next time step
-    iter = iter + 1;
-    PHI(:,:,iter+1) = zeros(size(RR));
+    if (iter > 500) && (mod(iter, 500) == 0)
+        fprintf('Iteration Ct: %i\n', iter);
+        fprintf('Current Residual: %0.5f\n', res(end));
+        figure(1);semilogy(1:iter, res);
+    end
+    iter = iter + 1; % use this to call nth time step
+    PHI(:,:,iter+1) = PHI(:,:,iter); % setup n+1th time step    
 
     % Calculate Velocity as function of PHI(n)
-    U_n = zeros(size(RR)); % PHI_T
-    V_n = zeros(size(RR)); % PHI_R
-    for i = 2:(length(T_vals)-1) % loop through theta
+    U_n = zeros(size(RR)); % PHI_X
+    V_n = zeros(size(RR)); % PHI_Y
+    for i = 2:(size(PHI,2)-1) % loop through xvals
         U_n(:,i) = (PHI(:,i+1,iter) - PHI(:,i-1,iter))./(2.*dT .* RR(:, i));
     end
-
-    for ii = 1:(length(r_vals)-1) % loop through radius
-        V_n(ii,:) = (PHI(ii+1,:,iter) - PHI(ii,:,iter))./(dr);
-    end
+    
     V_n(end,:) = BC.dirichlet.Vr_II; % apply far-field potential flow condition
+    for ii = 1:(size(PHI,1)-1) % loop through yvals
+        % Choose proper index... applies Neumann condition at surface for
+        % in-between grid
+        ii1 = ii + 1;
+        if ii == 1
+            ii_1 = ii;
+        else
+            ii_1 = ii-1;
+        end
+        
+        V_n(ii,:) = (PHI(ii1,:,iter) - PHI(ii_1,:,iter))./(2*dr); % central difference
+    end
     
     % Get Local Viscosity
     q2_ij = U_n.^2 + V_n.^2;
     a2_ij = (1./M0.^2)-0.5*(gam-1).*(q2_ij - 1);
     M2_ij = q2_ij./a2_ij; % local Mach number
-    eps_ij = max(zeros(size(M2_ij)), 1 - 1.0./(M2_ij));
     
-    % Get Density
+    
+    % Initialize Density
     phi_t = (PHI(:,:,iter) - PHI(:,:,iter-1))./dt;
-    rho_ij = (1 - 0.5*(gam-1).*M0.^2.*(q2_ij + 2*phi_t - 1)).^(1./(gam-1));
+    rho_ij = zeros([n_r, n_T-1]);
+    u_avg = rho_ij;
+    v_avg = rho_ij;
+    phi_t_avg = rho_ij;
+    
+    for i = 2:(n_r)
+        % looping through radius points
+        % here, we want to determine density through all the radii except
+        % for at the cylinder first, to account for the offset grid
+        
+        for ii = 1:(n_T-1)
+            % looping through angular points
+            % Will have 1 less point than grid b/c of offset
+            % Neumann enforced for density by setting end grid-points to be
+            % same if reflecte across boundary
+            
+            % Calculate average velocities... take average of four
+            % surrounding points of elements
+            u_avg(i,ii) = mean([U_n(i, ii), U_n(i-1, ii), U_n(i-1, ii+1), U_n(i, ii+1)]);
+            v_avg(i,ii) = mean([V_n(i, ii), V_n(i-1, ii), V_n(i-1, ii+1), V_n(i, ii+1)]);
+            phi_t_avg(i,ii) = mean([phi_t(i, ii), phi_t(i-1, ii), phi_t(i-1, ii+1), phi_t(i, ii+1)]);
+            
+            
+        end
+    end
+    
+    % Apply Neumann condition on velocities
+    u_avg(1,:) = u_avg(2,:);
+    v_avg(1,:) = v_avg(2,:);
+    phi_t_avg(1,:) = phi_t_avg(2,:);
+    
+    % Calculate Local (Artificial) Viscosity
+    q2_avg = u_avg.^2 + v_avg.^2; % total velocity
+    a2_avg = (1./M0.^2)-0.5*(gam-1).*(q2_avg - 1);
+    eps_ij = max(zeros(size(rho_ij)), 1 - 0.9.*(a2_avg./q2_avg));
+    
+    % Calculate uncorrected density 
+    rho_ij = (1 - 0.5*(gam-1).*M0.^2.*(q2_avg + 2.*phi_t_avg - 1)).^(1./(gam-1));
+    
+    if rho_ij(1,:) ~= rho_ij(2,:) % check if Neumann condition satisfied by cylinder surface
+        fprintf('Neumann condition not satisfied for density! Please check density before continuing.');
+    end
+    
+    % Calculate viscosity corrections
     del_rho_dT = zeros(size(rho_ij));
-    for i = 1:(length(T_vals)) % loop through theta
+    for i = 1:(size(rho_ij,2)) % loop through theta
         if i ==1 % Neumann BC
             i1 = i+1;
-            i_1 = i1;
-        elseif i == length(T_vals) % Neumann BC
-            i1 = i-1;
-            i_1 = i1;
+            i_1 = i;
+        elseif i == size(rho_ij,2) % Neumann BC
+            i1 = i;
+            i_1 = i-1;
         else
             i1 = i+1;
             i_1 = i-1;
         end
-        del_rho_dT(:,i) = 0.5.*(rho_ij(:,i1)-rho_ij(:,i_1))-0.5.*(sign(U_n(:,i))).*(rho_ij(:,i1)-2.*rho_ij(:,i)+rho_ij(:,i_1));
+        del_rho_dT(:,i) = 0.5.*(rho_ij(:,i1)-rho_ij(:,i_1))-0.5.*(sign(u_avg(:,i))).*(rho_ij(:,i1)-2.*rho_ij(:,i)+rho_ij(:,i_1));
     end
     
     del_rho_dr = zeros(size(rho_ij));
-    for ii = 1:(length(r_vals)) % loop through radius
+    for ii = 1:(size(rho_ij,1)) % loop through radius
         if ii ==1 % Neumann BC
-            del_rho_dr(ii,:) = 0.5*(rho_ij(ii+1,:) - rho_ij(ii,:))-0.5.*(sign(V_n(ii,:))).*(rho_ij(ii+1,:)-rho_ij(ii,:));
-        elseif ii == length(r_vals) % Dirichlet BC
-            del_rho_dr(ii,:) = zeros(size(rho_ij(end,:)));
+            del_rho_dr(ii,:) = 0.5*(rho_ij(ii+1,:) - rho_ij(ii,:))-0.5.*(sign(v_avg(ii,:))).*(rho_ij(ii+1,:)-rho_ij(ii,:));
+        elseif ii == size(rho_ij,1) % Dirichlet BC
+            del_rho_dr(ii,:) = 0.5*(ones(size(rho_ij(ii,:))) - rho_ij(ii,:))-0.5.*(sign(v_avg(ii,:))).*(ones(size(rho_ij(ii,:)))-2.*rho_ij(ii,:)-rho_ij(ii-1,:)); % assumes density to be zero at far-field
         else
-            del_rho_dr(ii,:) = 0.5*(rho_ij(ii+1,:) - rho_ij(ii,:))-0.5.*(sign(V_n(ii,:))).*(rho_ij(ii+1,:)-2.*rho_ij(ii,:)-rho_ij(ii-1,:));
+            del_rho_dr(ii,:) = 0.5*(rho_ij(ii+1,:) - rho_ij(ii,:))-0.5.*(sign(v_avg(ii,:))).*(rho_ij(ii+1,:)-2.*rho_ij(ii,:)-rho_ij(ii-1,:));
         end
     end
     
-    if all(max(q2_ij(1,:)) == 0)
-        rho_ds = zeros(size(U_n));        
-    else
-        rho_ds = (U_n./sqrt(q2_ij)).*del_rho_dT + (V_n./sqrt(q2_ij)).*del_rho_dr;
-    end
+%     if any((q2_avg(:)) == 0)
+%         rho_ds = ones(size(u_avg));        
+%     else
+    rho_ds = (u_avg./sqrt(q2_avg)).*del_rho_dT + (v_avg./sqrt(q2_avg)).*del_rho_dr;
+%     end
     RHO = rho_ij - eps_ij.*rho_ds;
     
-    % Initialize Solution
-    PHI_T = zeros(size(RR));
-    PHI_R = zeros(size(RR));
+    % Calculate Average Densities on Grid
+    RHO_Tavg = zeros(size(RHO));
+    for i = 1:size(RHO,1) % loop through radius
+        if i == size(RHO,1)
+            RHO_Tavg(i,:) = 0.5.*(RHO(i,:) + ones(size(RHO(i,:)))); % assume density is 1 at farfield
+        else
+            RHO_Tavg(i,:) = 0.5.*(RHO(i,:) + RHO(i+1,:));
+        end
+    end
+    
+    RHO_Ravg = zeros(size(RR));
+    for i = 1:size(RHO_Ravg,2) % loop through Thetas
+        if i == 1 % Apply Neumann condition
+           i1 = i;
+           i_1 = i1;
+        elseif i == size(RHO_Ravg,2) % Apply Neumann Condition
+            i1 = i-1;
+            i_1 = i1;
+        else
+            i1 = i;
+            i_1 = i-1;
+        end
+        RHO_Ravg(:,i) = 0.5.*(RHO(:,i1) + RHO(:,i_1)); 
+    end
     
     for i = 1:length(T_vals) % loop through theta        
         for j = 1:(length(r_vals)-1) % loop through radius
@@ -121,12 +202,23 @@ while res(end) > tol % iterate through time
                 i1 = i+1;
                 i_1 = i1;
             elseif i == length(T_vals)
-                i0 = i;
                 i1 = i-1;
                 i_1 = i-1;
             else
                 i1 = i+1;
                 i_1 = i-1;
+            end
+            
+            % Boundary Conditions for Density
+            if i == 1 % Apply Neumann condition
+                i1r = i;
+                i_1r = i1r;
+            elseif i == size(RHO_Ravg,2) % Apply Neumann Condition
+                i1r = i-1;
+                i_1r = i1r;
+            else
+                i1r = i;
+                i_1r = i-1;
             end
 
             % Boundary Conditions for Radius
@@ -136,34 +228,26 @@ while res(end) > tol % iterate through time
             else
                 j1 = j+1;
                 j_1 = j-1;
+                RR_j0 = 0.5*(RR(j_1, i0) + RR(j0,i0));
             end
-            
-            % Density averages
-            RHO_i1 = 0.5*(RHO(j0,i1) + RHO(j0,i0));
-            RHO_i0 = 0.5*(RHO(j0,i_1) + RHO(j0,i0));
-            RHO_j1 = 0.5*(RHO(j1, i0) + RHO(j0,i0));
-            RHO_j0 = 0.5*(RHO(j_1, i0) + RHO(j0,i0)); 
             
             % Radius Averages
-            RR_i1 = 0.5*(RR(j0,i1) + RR(j0,i0));
-            RR_i0 = 0.5*(RR(j0,i_1) + RR(j0,i0));
             RR_j1 = 0.5*(RR(j1, i0) + RR(j0,i0));
-            RR_j0 = 0.5*(RR(j_1, i0) + RR(j0,i0));
             
             if j == 1
-                PHI_RR = (RR_j1*RHO_j1*V_n(j0,i0))/(RR(j0,i0)*dr);
+                PHI_RR = (RR_j1*RHO_Ravg(j1,i0)*(PHI(j1,i0,iter) - PHI(j0,i0,iter))/dr)/(RR(j0,i0)*dr);
             else
-                PHI_RR = (RR_j1*RHO_j1*V_n(j0,i0) - RR_j0*RHO_j0*V_n(j_1,i0))/(RR(j0,i0)*dr);
+                PHI_RR = (RR_j1*RHO_Ravg(j1,i0)*(PHI(j1,i0,iter) - PHI(j0,i0,iter))/dr - RR_j0*RHO_Ravg(j0,i0)*(PHI(j0,i0,iter) - PHI(j_1,i0,iter))/dr)/(RR(j0,i0)*dr);
             end
             
-            PHI_TT = (1/RR(j0,i0)^2)*(1/dT)*(RHO_i1*U_n(i0) - RHO_i0*U_n(i_1));
+            PHI_TT = (1/RR(j0,i0)^2)*(1/dT)*(RHO_Tavg(j0, i1r)*(PHI(j0,i1,iter) - PHI(j0,i0,iter))/dT - RHO_Tavg(j0, i_1r)*(PHI(j0,i0,iter) - PHI(j0,i_1,iter))/dT);
             
             PHI(j0,i0,iter+1) = ((0.5*alpha/dt - 1/(dt^2))*PHI(j0,i0,iter-1) + 2/(dt^2)*PHI(j0,i0,iter) + PHI_RR + PHI_TT)/(1/dt^2 + 0.5*alpha/dt);
             
         end
     end
     
-    PHI(end,:,iter+1) = BC.dirichlet.PHI_II;
+    PHI(end,:,iter+1) = BC.dirichlet.PHI_II; % apply BC at outer boundary
     
     % Run Residual Check
     difference = abs(PHI(:,:,iter+1) - PHI(:,:,iter));
@@ -173,5 +257,39 @@ while res(end) > tol % iterate through time
 %     x_res(n-2) = xx;
 end
 
+%% Post Process
+
+figure(1);semilogy(1:iter, res);
+
+% plot density
+figure();contourf(XX,YY,RHO_Ravg, 50)
+
+figure(); % cp plots
+contourf(XX, YY, 1-(q2_ij), 50); %./((RR.*cos(TT)).^2)
+title('Pressure Coefficient Contours');
+colorbar('eastoutside');
+axis equal
+
 figure();
-contourf(XX, YY, PHI(:,:,end));
+plot(TT(1,:)*180/pi, 1 - q2_ij(1,:));
+xlabel('\theta');
+%     ylabel('\phi_{\theta}');
+ylabel('C_p');
+title('C_p on surface of Cylinder');
+set(gca, 'Xdir', 'reverse');
+
+figure(); % field potential
+contourf(XX, YY, PHI(:,:,end), 50);
+title('Field Potential');
+colorbar('eastoutside');
+axis equal
+
+figure(); % x-dir velocity plots
+contourf(XX, YY, U_n, 50); %./((RR.*cos(TT)).^2)
+title('PHI_\theta velocity');
+colorbar('eastoutside');
+
+figure();
+contourf(XX, YY, sqrt(M2_ij), 50);
+title('Mach Number');
+colorbar('eastoutside');

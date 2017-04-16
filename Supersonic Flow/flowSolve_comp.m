@@ -19,7 +19,6 @@ PHI(:,:,2) = PHI(:,:,1);
 
 % Boundary Conditions for field at time n
 PHI_BC = RR(n_r,:).*cos(TT(n_r,:)) + cos(TT(n_r,:))./RR(n_r,:);
-% PHI_cyl = RR(1,:).*cos(TT(1,:)) + cos(TT(1,:))./RR(1,:);
 
 % Initialize flow field derivatives
 RHO = zeros(size(PHI));
@@ -27,8 +26,6 @@ PHI_R = zeros(size(PHI));
 PHI_T = zeros(size(PHI));
 M_IJ = zeros(size(PHI));
 [PHI_R(:,:,2), PHI_T(:,:,2), RHO(:,:,2)] = update_rho(PHI, RR, flow.M0, flow.gamma);
-% e_visc = -0.001;
-
 
 % Initialize error checks
 res = ones(1,2);
@@ -163,14 +160,14 @@ function [phi_r, phi_th, rho, M_ij] = update_rho(phi, rr, M0, gam)
 
     phi_r(1,:) = zeros(size(phi_r(1,:))); % surface boundary condition
     phi_r(end,:) = (phi(end,:,n)-phi(end-1,:,n))./(dr); % backwards
+    V_r = phi_r;
 
-    % Angular derivative
+    % Angular gradient
     for ii = 2:(n_T-1)
         ii0 = ii;
         ii1 = ii+1;
         ii_1 = ii-1;
         % Central differencing scheme
-%         phi_th(:,ii0) =  (1./rr(:,ii0)).*(phi(:,ii1,n)-phi(:,ii_1,n))./(2*dT);
         phi_th(:,ii0) = (phi(:,ii1,n)-phi(:,ii_1,n))./(2*dT);
         
         if ~isreal(phi_th(:,ii0))
@@ -180,24 +177,24 @@ function [phi_r, phi_th, rho, M_ij] = update_rho(phi, rr, M0, gam)
 
     phi_th(:,1) = zeros(size(phi_th(:,1))); % symmetric boundary condition
     phi_th(:,n_T) = zeros(size(phi_th(:,n_T))); % symmetric boundary condition
+    V_th = phi_th./rr;
 
     % Time Derivative
     phi_t = (phi(:,:,n) - phi(:,:,n-1))/dt;
 
     % Local speed of sound
-%     a2_ij = (gam - 1).*(0.5 + 1./((gam-1)*M0^2) - 0.5.*(phi_r.^2 + (phi_th./rr).^2));
-    a2_ij = (1/(M0^2) - 0.5*(gam - 1).*(phi_r.^2 + (phi_th./rr).^2 -1));
+    a2_ij = (1/(M0^2) - 0.5*(gam - 1).*(V_r.^2 + V_th.^2 -1));
 
     % Local Mach number & artificial viscosity
-    q2_ij = ((phi_th./rr).^2 + phi_r.^2);
+    q2_ij = (V_th.^2 + V_r.^2);
     M2_ij = q2_ij./a2_ij;
     M_ij = M2_ij.^0.5;
-%     eps = max(zeros(size(M2_ij)), 1 - 0.9./(M2_ij));
-    eps = zeros(size(M2_ij));
+    eps = max(zeros(size(M2_ij)), 1 - 1.0./(M2_ij));
+%     eps = zeros(size(M2_ij));
 %     eps = 0.02*ones(size(M_ij));%max(zeros(size(M_ij)), 1 - 0.9./(M0^2 .* ones(size(M_ij))));
 
     % Local density calculations
-    rho_bar = (1 - 0.5.*(gam-1).*M0^2.*(phi_r.^2 + (phi_th./rr).^2 + 2*phi_t - 1)).^(1/(gam-1));
+    rho_bar = (1 - 0.5.*(gam-1).*M0^2.*(q2_ij + 2*phi_t - 1)).^(1/(gam-1));
 
     for ii = 1:n_T % loop through Thetas
         ii0 = ii;
