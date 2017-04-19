@@ -17,14 +17,14 @@ chord = 1.0;
 
 % Field Axis Values
 y_max = 5;
-x_max = 5.0;
+x_max = 6.0;
 x_vals = (-4*dx):dx:x_max;
 y_vals = 0:dy:y_max;
 [XX, YY] = meshgrid(x_vals, y_vals);
 
 % Fluid Params
 gam = 1.4; % heat 
-M0 = 1.2;
+M0 = 0.0;
 visc = 0.0;
 
 %% SIM CONTROL VARIABLE INITIALIZATION
@@ -71,34 +71,40 @@ while res(end) > tol % iterate through time
     end
     U_n(:,1) = BC.Vx_I;
     
-    % Initialize Density
-    rho_ij = zeros([size(XX,1), size(XX,2)-1]);
-    u_avg = rho_ij;
-    
-    for i = 2:(n_r) % looping through y-dir points
-        for ii = 1:(n_T-1) % looping through x-dir points
-            % Will have 1 less point than grid b/c of offset
-            % Neumann enforced for density by setting end grid-points to be
-            % same if reflecte across boundary
-            
-            % Calculate average velocities... take average of four
-            % surrounding points of elements
-            u_avg(i,ii) = mean([U_n(i, ii), U_n(i-1, ii), U_n(i-1, ii+1), U_n(i, ii+1)]);
-        end
-    end
-    
-    % Apply Neumann condition on velocities
-    u_avg(1,:) = u_avg(2,:);
-    
-    a2_avg = (1./M0.^2)-0.5*(gam-1).*(u_avg.^2 - 1);
-    eps_ij = max(zeros(size(rho_ij)), 1 - (a2_avg./(u_avg.^2)));
+    % Initialize Density - no need for displaced grid
+%     rho_ij = zeros(size(U_n));
+%     u_avg = rho_ij;
+%     
+%     for i = 2:(n_r) % looping through y-dir points
+%         for ii = 1:(n_T-1) % looping through x-dir points
+%             % Will have 1 less point than grid b/c of offset
+%             % Neumann enforced for density by setting end grid-points to be
+%             % same if reflecte across boundary
+%             
+%             % Calculate average velocities... take average of four
+%             % surrounding points of elements
+%             u_avg(i,ii) = mean([U_n(i, ii), U_n(i-1, ii), U_n(i-1, ii+1), U_n(i, ii+1)]);
+%         end
+%     end
+%     
+%     % Apply Neumann condition on velocities
+%     u_avg(1,:) = u_avg(2,:);
+%     
+%     a2_avg = (1./M0.^2)-0.5*(gam-1).*(u_avg.^2 - 1);
+%     eps_ij = max(zeros(size(rho_ij)), 1 - (a2_avg./(u_avg.^2)));
     
     % Calculate uncorrected density 
-    rho_ij = (1 - 0.5*(gam-1).*M0.^2.*(u_avg.^2 - 1)).^(1./(gam-1));
+%     rho_ij = (1 - 0.5*(gam-1).*M0.^2.*(u_avg.^2 - 1)).^(1./(gam-1));
+    rho_ij = (1 - 0.5*(gam-1).*M0.^2.*(U_n.^2 - 1)).^(1./(gam-1));
+    a2_avg = (1./M0.^2)-0.5*(gam-1).*(U_n.^2 - 1);
+    eps_ij = max(zeros(size(rho_ij)), 1 - 0.9.*(a2_avg./(U_n.^2)));
+%     eps_ij = max(zeros(size(rho_ij)), 0.9.*(a2_avg./(U_n.^2)));
+    M_ij = U_n./sqrt(a2_avg);
+
     
-    if rho_ij(1,:) ~= rho_ij(2,:) % check if Neumann condition satisfied by cylinder surface
-        fprintf('Neumann condition not satisfied for density! Please check density before continuing.\n');
-    end
+%     if rho_ij(1,:) ~= rho_ij(2,:) % check if Neumann condition satisfied by cylinder surface
+%         fprintf('Neumann condition not satisfied for density! Please check density before continuing.\n');
+%     end
     
     % Calculate viscosity corrections
 %     rho_ds = [rho_ij(:,1)-ones(size(rho_ij(:,1))), diff(rho_ij,1,2)];
@@ -113,14 +119,14 @@ while res(end) > tol % iterate through time
     
     RHO = rho_ij - eps_ij.*rho_ds;
     
-    RHO_Xavg = zeros(size(RHO));
-    for i = 1:size(RHO,1) % loop through y-dir
-        if i == size(RHO,1)
-            RHO_Xavg(i,:) = 0.5.*(RHO(i,:) + ones(size(RHO(i,:)))); % assume density is 1 at farfield
-        else
-            RHO_Xavg(i,:) = 0.5.*(RHO(i,:) + RHO(i+1,:)); % assumes density grid is shifted half down from regular grid
-        end
-    end
+    RHO_Xavg = diff(RHO,1,2);
+%     for i = 1:size(RHO,1) % loop through y-dir
+%         if i == size(RHO,1)
+%             RHO_Xavg(i,:) = 0.5.*(RHO(i,:) + ones(size(RHO(i,:)))); % assume density is 1 at farfield
+%         else
+%             RHO_Xavg(i,:) = 0.5.*(RHO(i,:) + RHO(i+1,:)); % assumes density grid is shifted half down from regular grid
+%         end
+%     end
     
     for i = 2:(size(U_n,2)-1) % loop through x-dir        
         for j = 1:(size(U_n,1)-1) % loop through y_dir
@@ -134,7 +140,7 @@ while res(end) > tol % iterate through time
             else
                PHI_Y_1 = PHI(j,i,iter+1) - PHI(j-1,i,iter+1);
             end
-            PHI(j,i+1,iter+1) = PHI(j,i,iter+1) + (dx/RHO_Xavg(j,i))*((RHO_Xavg(j,i-1)/dx)*(PHI(j,i,iter+1)-PHI(j,i-1,iter+1)) - dx/(dy^2)*((PHI(j+1,i,iter+1)-PHI(j,i,iter+1) - PHI_Y_1)));
+            PHI(j,i+1,iter+1) = PHI(j,i,iter+1) + (RHO_Xavg(j,i-1)/RHO_Xavg(j,i))*(PHI(j,i,iter+1)-PHI(j,i-1,iter+1)) - (1/RHO_Xavg(j,i))*(dx^2/dy^2)*(PHI(j+1,i,iter+1)-PHI(j,i,iter+1) - PHI_Y_1);
         end
     end
     
@@ -142,3 +148,37 @@ while res(end) > tol % iterate through time
     difference = abs(PHI(:,:,iter+1) - PHI(:,:,iter));
     [res(iter), ind(iter)] = max(difference(:));
 end
+
+%% Post Process
+
+% figure();contourf(XX,YY,RHO_Ravg, 50)
+
+figure(); % cp plots
+contourf(XX, YY, 1-(q2_avg), 50); %./((RR.*cos(TT)).^2)
+title('Pressure Coefficient Contours');
+colorbar('eastoutside');
+axis equal
+
+figure();
+plot(TT(1,:)*180/pi, 1 - q2_ij(1,:));
+xlabel('\theta');
+%     ylabel('\phi_{\theta}');
+ylabel('C_p');
+title('C_p on surface of Cylinder');
+set(gca, 'Xdir', 'reverse');
+
+figure(); % field potential
+contourf(XX, YY, PHI(:,:,end), 50);
+title('Field Potential');
+colorbar('eastoutside');
+axis equal
+
+figure(); % x-dir velocity plots
+contourf(XX, YY, U_n, 50); %./((RR.*cos(TT)).^2)
+title('PHI_\theta velocity');
+colorbar('eastoutside');
+
+figure();
+contourf(XX, YY, sqrt(M2_ij), 50);
+title('Mach Number');
+colorbar('eastoutside');
