@@ -6,10 +6,10 @@ close all;
 
 % Step Sizes
 dr = 0.1;
-dT = 0.01*pi;
-dt = 0.1*dr;
+dT = 0.005*pi;
+dt = 0.01;
 
-alpha = 2.5;
+alpha = 25.0;
 
 % Cylinder Dimensions
 r_cyl = 1.0;
@@ -31,7 +31,7 @@ YY = RR .* sin(TT);
 
 % Fluid Params
 gam = 1.4; % heat 
-M0 = 0.25;
+M0 = 0.49;
 visc = 0.0;
 
 %% FIELD VARIABLE INITIALIZATION
@@ -43,10 +43,11 @@ PHI(:,:,2) = PHI(:,:,1);
 res = 1;
 ind = 0;
 iter = 1.0;
-tol = 1e-5;
+tol = 0.1e-4;
 
 BC.dirichlet.Vr_II = cos(TT(end,:)).*(1 - (r_cyl^2)./(RR(end,:).^2));
 BC.dirichlet.PHI_II = (RR(end,:) + (r_cyl^2)./(RR(end,:))).*cos(TT(end,:));
+visc_on = 0;
 
 %% START SOLUTION
 
@@ -65,24 +66,6 @@ while res(end) > tol % iterate through time
         fprintf('PHI exhibits non-solutions (either non-real or NaN) in nodes!\n');
     end
 
-    % Calculate Velocity as function of PHI(n)
-    U_n = zeros(size(RR)); % PHI_X
-    V_n = zeros(size(RR)); % PHI_Y
-    for i = 2:(size(PHI,2)-1) % loop through thetas
-        U_n(:,i) = (PHI(:,i+1,iter) - PHI(:,i-1,iter))./(2*dT .* RR(:, i));
-    end
-    
-    V_n(end,:) = BC.dirichlet.Vr_II; % apply far-field potential flow condition
-    for ii = 2:(size(PHI,1)-1) % loop through radii
-        V_n(ii,:) = (PHI(ii+1,:,iter) - PHI(ii-1,:,iter))./(dr); % central difference
-    end
-    
-    % Get Local Viscosity
-    q2_ij = U_n.^2 + V_n.^2;
-    a2_ij = (1./M0.^2)-0.5*(gam-1).*(q2_ij - 1);
-    M2_ij = q2_ij./a2_ij; % local Mach number
-    
-    
     % Initialize Density
     phi_t = (PHI(:,:,iter) - PHI(:,:,iter-1))./dt;
     rho_ij = zeros([n_r, n_T-1]);
@@ -116,16 +99,21 @@ while res(end) > tol % iterate through time
     % Calculate Local (Artificial) Viscosity
     q2_avg = u_avg.^2 + v_avg.^2; % total velocity
     a2_avg = (1./M0.^2)-0.5*(gam-1).*(q2_avg - 1);
-    eps_ij = 1.3.*max(zeros(size(rho_ij)), 1 - 0.99.*(a2_avg./q2_avg));
-    
-    % Calculate uncorrected density
-    test =  q2_avg + 2.*phi_t_avg - 1;
-    if (1 - 0.5*(gam-1).*M0^2*(max(abs(test(:))))) < 0
-        fprintf('Density is complex! Please resolve before continuing!\n');
+    eps_ij = max(zeros(size(rho_ij)), 1 - 0.99.*(a2_avg./q2_avg));
+    if any(any(eps_ij ~= 0)) && (visc_on ==0) % viscosity not being used and then turned on
+        visc_on = 1;
+        fprintf('Viscosity model activated! Iteration: %i\n', iter);        
+    elseif (visc_on == 1) && all(all(eps_ij == 0))
+        visc_on = 0;
+        fprintf('Viscosity model turned off! Iteration: %i\n', iter);
     end
     
+    % Calculate uncorrected density
     rho_ij = (1 - 0.5*(gam-1).*M0.^2.*(q2_avg + 2.*phi_t_avg - 1)).^(1./(gam-1));
-    
+    if ~isreal(rho_ij)
+        fprintf('Density is complex! Please resolve before continuing!\n');
+    end
+        
     if (M0 == 0) & ((rho_ij(1,:) ~= 1))
         fprintf('Incompressible Case not satisfied!\n');
     end
@@ -235,7 +223,8 @@ while res(end) > tol % iterate through time
             
             PHI_TT = (1/RR(j0,i0)^2)*(1/dT)*(RHO_Tavg(j0, i1r)*(PHI(j0,i1,iter) - PHI(j0,i0,iter))/dT - RHO_Tavg(j0, i_1r)*(PHI(j0,i0,iter) - PHI(j0,i_1,iter))/dT);
             
-            PHI(j0,i0,iter+1) = ((0.5*alpha/dt - 1/(dt^2))*PHI(j0,i0,iter-1) + 2/(dt^2)*PHI(j0,i0,iter) + PHI_RR + PHI_TT)/(1/dt^2 + 0.5*alpha/dt);
+%             PHI(j0,i0,iter+1) = ((0.5*alpha/dt - 1/(dt^2))*PHI(j0,i0,iter-1) + 2/(dt^2)*PHI(j0,i0,iter) + PHI_RR + PHI_TT)/(1/dt^2 + 0.5*alpha/dt);
+            PHI(j0,i0,iter+1) = (PHI_RR + PHI_TT + 2/(dt^2)*PHI(j0,i0,iter) - (1/dt^2 - 0.5*alpha/dt)*PHI(j0,i0,iter-1))/(1/dt^2 + 0.5*alpha/dt);
             
         end
     end
@@ -245,20 +234,81 @@ while res(end) > tol % iterate through time
     % Run Residual Check
     difference = abs(PHI(:,:,iter+1) - PHI(:,:,iter));
     [res(iter), ind(iter)] = max(difference(:));
+    
+%     % Calculate Velocity as function of PHI(n)
+%     U_n = zeros(size(RR)); % PHI_X
+%     V_n = zeros(size(RR)); % PHI_Y
+%     for i = 2:(size(PHI,2)-1) % loop through thetas
+%         U_n(:,i) = (PHI(:,i+1,iter) - PHI(:,i-1,iter))./(2*dT .* RR(:, i));
+%     end
+%     
+%     V_n(end,:) = BC.dirichlet.Vr_II; % apply far-field potential flow condition
+%     for ii = 2:(size(PHI,1)-1) % loop through radii
+%         V_n(ii,:) = (PHI(ii+1,:,iter) - PHI(ii-1,:,iter))./(2*dr); % central difference
+%     end
+%     
+%     q2_ij = U_n.^2 + V_n.^2;
+%     a2_ij = (1./M0.^2)-0.5*(gam-1).*(q2_ij - 1);
+%     M2_ij = q2_ij./a2_ij; % local Mach number
 end
 
 %% Post Process
 
+% Calculate Velocity as function of PHI(n)
+U_n = zeros(size(RR)); % PHI_X
+V_n = zeros(size(RR)); % PHI_Y
+for i = 2:(size(PHI,2)-1) % loop through thetas
+    U_n(:,i) = (PHI(:,i+1,iter) - PHI(:,i-1,iter))./(2*dT .* RR(:, i));
+end
+
+V_n(end,:) = BC.dirichlet.Vr_II; % apply far-field potential flow condition
+for ii = 2:(size(PHI,1)-1) % loop through radii
+    V_n(ii,:) = (PHI(ii+1,:,iter) - PHI(ii-1,:,iter))./(2*dr); % central difference
+end
+
+q2_ij = U_n.^2 + V_n.^2;
+a2_ij = (1./M0.^2)-0.5*(gam-1).*(q2_ij - 1);
+M2_ij = q2_ij./a2_ij; % local Mach number
+
+M_ij = sqrt(M2_ij);
+% if M0 == 0
+%     folder = 'incompressible';
+% elseif max(M_ij(:)) < 1.0
+%     folder = 'subsonic';
+% else
+%     folder = 'supersonic';
+% end
+
+folderName = ['M_' num2str(M0)];
+
+if ~exist([pwd '\cylinder\' folderName], 'dir')
+    mkdir([pwd '\cylinder\' folderName]);
+end
+
+close all;
 figure(1);semilogy(1:iter, res);
+title('Residual Plot');
+xlabel('# of iterations');
+ylabel('Residual (Error)');
+
+saveas(gcf, [pwd '\cylinder\' folderName '\residual_plot.png']);
+saveas(gcf, [pwd '\cylinder\' folderName '\residual_plot']);
 
 % plot density
 figure();contourf(XX,YY,RHO_Ravg, 50)
+title('Density (Normalized)');
+colorbar('eastoutside');
+axis equal
+saveas(gcf, [pwd '\cylinder\' folderName '\density.png']);
+saveas(gcf, [pwd '\cylinder\' folderName '\density']);
 
 figure(); % cp plots
 contourf(XX, YY, 1-(q2_ij), 50); %./((RR.*cos(TT)).^2)
 title('Pressure Coefficient Contours');
 colorbar('eastoutside');
 axis equal
+saveas(gcf, [pwd '\cylinder\' folderName '\cp_contour.png']);
+saveas(gcf, [pwd '\cylinder\' folderName '\cp_contour']);
 
 figure();
 plot(TT(1,:)*180/pi, 1 - q2_ij(1,:));
@@ -267,19 +317,35 @@ xlabel('\theta');
 ylabel('C_p');
 title('C_p on surface of Cylinder');
 set(gca, 'Xdir', 'reverse');
+saveas(gcf, [pwd '\cylinder\' folderName '\cp_surf.png']);
+saveas(gcf, [pwd '\cylinder\' folderName '\cp_surf']);
 
 figure(); % field potential
 contourf(XX, YY, PHI(:,:,end), 50);
-title('Field Potential');
+title('Field Potential, \Phi');
 colorbar('eastoutside');
 axis equal
+saveas(gcf, [pwd '\cylinder\' folderName '\phi_pot.png']);
+saveas(gcf, [pwd '\cylinder\' folderName '\phi_pot']);
 
-figure(); % x-dir velocity plots
+figure(); % theta-dir velocity plots
 contourf(XX, YY, U_n, 50); %./((RR.*cos(TT)).^2)
-title('PHI_\theta velocity');
+title('\Phi_\theta velocity');
 colorbar('eastoutside');
+saveas(gcf, [pwd '\cylinder\' folderName '\phi_theta.png']);
+saveas(gcf, [pwd '\cylinder\' folderName '\phi_theta']);
+
+figure(); % theta-dir velocity plots
+contourf(XX, YY, V_n, 50); %./((RR.*cos(TT)).^2)
+title('\Phi_R velocity');
+colorbar('eastoutside');
+saveas(gcf, [pwd '\cylinder\' folderName '\phi_radius.png']);
+saveas(gcf, [pwd '\cylinder\' folderName '\phi_radius']);
 
 figure();
 contourf(XX, YY, sqrt(M2_ij), 50);
 title('Mach Number');
 colorbar('eastoutside');
+axis equal
+saveas(gcf, [pwd '\cylinder\' folderName '\mach.png']);
+saveas(gcf, [pwd '\cylinder\' folderName '\mach']);
