@@ -31,7 +31,7 @@ YY = RR .* sin(TT);
 
 % Fluid Params
 gam = 1.4; % heat 
-M0 = 0.52;
+M0 = 0.25;
 visc = 0.0;
 
 %% FIELD VARIABLE INITIALIZATION
@@ -43,7 +43,7 @@ PHI(:,:,2) = PHI(:,:,1);
 res = 1;
 ind = 0;
 iter = 1.0;
-tol = 1e-3;
+tol = 1e-5;
 
 BC.dirichlet.Vr_II = cos(TT(end,:)).*(1 - (r_cyl^2)./(RR(end,:).^2));
 BC.dirichlet.PHI_II = (RR(end,:) + (r_cyl^2)./(RR(end,:))).*cos(TT(end,:));
@@ -74,8 +74,6 @@ while res(end) > tol % iterate through time
     
     V_n(end,:) = BC.dirichlet.Vr_II; % apply far-field potential flow condition
     for ii = 2:(size(PHI,1)-1) % loop through radii
-        % Choose proper index... applies Neumann condition at surface for
-        % in-between grid
         V_n(ii,:) = (PHI(ii+1,:,iter) - PHI(ii-1,:,iter))./(dr); % central difference
     end
     
@@ -92,21 +90,18 @@ while res(end) > tol % iterate through time
     v_avg = rho_ij;
     phi_t_avg = rho_ij;
     
-    for j = 2:(n_r)
+    for j = 2:(n_r) % assume same number of points in the radius direction
         % looping through radius points
         % here, we want to determine density through all the radii except
         % for at the cylinder first, to account for the offset grid
         
-        for ii = 1:(n_T-1)
+        for ii = 1:(n_T-1) % assume one less set of points in theta direction, due to between-grid calculation
             % looping through angular points
             % Will have 1 less point than grid b/c of offset
             % Neumann enforced for density by setting end grid-points to be
             % same if reflecte across boundary
             
-            % Calculate average velocities... take average of four
-            % surrounding points of elements
-%             u_avg(j,ii) = mean([U_n(j, ii), U_n(j-1, ii), U_n(j-1, ii+1), U_n(j,ii+1)]);
-%             v_avg(j,ii) = mean([V_n(j, ii), V_n(j, ii+1), V_n(j-1, ii+1), U_n(j,ii+1)]);
+            % Calculate average velocities...
             u_avg(j,ii) = 0.5*((PHI(j,ii+1,iter) - PHI(j,ii,iter))/(RR(j,ii)*dT) + (PHI(j-1,ii+1,iter) - PHI(j-1,ii,iter))/(RR(j-1,ii)*dT));
             v_avg(j,ii) = 0.5*((PHI(j,ii,iter) - PHI(j-1,ii,iter))/dr + (PHI(j,ii+1,iter) - PHI(j-1,ii+1,iter))/dr);
             phi_t_avg(j,ii) = mean([phi_t(j, ii), phi_t(j-1, ii), phi_t(j-1, ii+1), phi_t(j, ii+1)]);            
@@ -116,8 +111,6 @@ while res(end) > tol % iterate through time
     % Apply Neumann condition on velocities
     u_avg(1,:) = u_avg(2,:);
     v_avg(1,:) = v_avg(2,:);
-%     u_avg(1,:) = (PHI(1,2:end,iter) - PHI(1,1:(end-1),iter))/(RR(1,2:end)*dT); %
-%     v_avg(1,:) = zeros(size(v_avg(1,:))); %
     phi_t_avg(1,:) = phi_t_avg(2,:);
     
     % Calculate Local (Artificial) Viscosity
@@ -133,8 +126,8 @@ while res(end) > tol % iterate through time
     
     rho_ij = (1 - 0.5*(gam-1).*M0.^2.*(q2_avg + 2.*phi_t_avg - 1)).^(1./(gam-1));
     
-    if rho_ij(1,:) ~= rho_ij(2,:) % check if Neumann condition satisfied by cylinder surface
-        fprintf('Neumann condition not satisfied for density! Please check density before continuing.\n');
+    if (M0 == 0) & ((rho_ij(1,:) ~= 1))
+        fprintf('Incompressible Case not satisfied!\n');
     end
     
     % Calculate viscosity corrections
@@ -164,11 +157,7 @@ while res(end) > tol % iterate through time
         end
     end
     
-%     if any((q2_avg(:)) == 0)
-%         rho_ds = ones(size(u_avg));        
-%     else
     rho_ds = (u_avg./sqrt(q2_avg)).*del_rho_dT + (v_avg./sqrt(q2_avg)).*del_rho_dr;
-%     end
     RHO = rho_ij - eps_ij.*rho_ds;
     
     % Calculate Average Densities on Grid
@@ -256,9 +245,6 @@ while res(end) > tol % iterate through time
     % Run Residual Check
     difference = abs(PHI(:,:,iter+1) - PHI(:,:,iter));
     [res(iter), ind(iter)] = max(difference(:));
-%     [yy, xx] = ind2sub(size(difference), ind(iter));
-%     y_res(n-2) = yy;
-%     x_res(n-2) = xx;
 end
 
 %% Post Process
