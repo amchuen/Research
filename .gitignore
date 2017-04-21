@@ -45,3 +45,7 @@ $RECYCLE.BIN/
 Network Trash Folder
 Temporary Items
 .apdisk
+*.png
+*.fig
+Reports/Winter_Report.aux
+*.log
