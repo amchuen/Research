@@ -43,7 +43,7 @@ PHI(:,:,2) = PHI(:,:,1);
 res = 1;
 ind = 0;
 iter = 1.0;
-tol = 0.1e-4;
+tol = 1e-3;
 
 BC.dirichlet.Vr_II = cos(TT(end,:)).*(1 - (r_cyl^2)./(RR(end,:).^2));
 BC.dirichlet.PHI_II = (RR(end,:) + (r_cyl^2)./(RR(end,:))).*cos(TT(end,:));
@@ -99,7 +99,7 @@ while res(end) > tol % iterate through time
     % Calculate Local (Artificial) Viscosity
     q2_avg = u_avg.^2 + v_avg.^2; % total velocity
     a2_avg = (1./M0.^2)-0.5*(gam-1).*(q2_avg - 1);
-    eps_ij = max(zeros(size(rho_ij)), 1 - 0.99.*(a2_avg./q2_avg));
+    eps_ij = 1.2.*max(zeros(size(rho_ij)), 1 - 0.99.*(a2_avg./q2_avg));
     if any(any(eps_ij ~= 0)) && (visc_on ==0) % viscosity not being used and then turned on
         visc_on = 1;
         fprintf('Viscosity model activated! Iteration: %i\n', iter);        
@@ -112,10 +112,6 @@ while res(end) > tol % iterate through time
     rho_ij = (1 - 0.5*(gam-1).*M0.^2.*(q2_avg + 2.*phi_t_avg - 1)).^(1./(gam-1));
     if ~isreal(rho_ij)
         fprintf('Density is complex! Please resolve before continuing!\n');
-    end
-        
-    if (M0 == 0) & ((rho_ij(1,:) ~= 1))
-        fprintf('Incompressible Case not satisfied!\n');
     end
     
     % Calculate viscosity corrections
@@ -147,6 +143,10 @@ while res(end) > tol % iterate through time
     
     rho_ds = (u_avg./sqrt(q2_avg)).*del_rho_dT + (v_avg./sqrt(q2_avg)).*del_rho_dr;
     RHO = rho_ij - eps_ij.*rho_ds;
+    
+    if (M0 == 0) && any(any(RHO~=1))
+        fprintf('Incompressible Case not satisfied!\n');
+    end
     
     % Calculate Average Densities on Grid
     RHO_Tavg = zeros(size(RHO));
