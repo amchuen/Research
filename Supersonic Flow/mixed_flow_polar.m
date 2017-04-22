@@ -9,7 +9,7 @@ dr = 0.1;
 dT = 0.005*pi;
 dt = 0.01;
 
-alpha = 30.0;
+alpha = 60;
 
 % Cylinder Dimensions
 r_cyl = 1.0;
@@ -31,7 +31,7 @@ YY = RR .* sin(TT);
 
 % Fluid Params
 gam = 1.4; % heat 
-M0 = 0.52;
+M0 = 0.53;
 visc = 0.0;
 
 %% FIELD VARIABLE INITIALIZATION
@@ -81,7 +81,14 @@ while res(end) > tol % iterate through time
     q2_ij = U_n.^2 + V_n.^2;
     a2_ij = (1./M0.^2)-0.5*(gam-1).*(q2_ij - 1);
     eps_ij = max(zeros(size(a2_ij)), 1 - 0.99.*(a2_ij./q2_ij));
-%     M2_ij = q2_ij./a2_ij; % local Mach number
+    
+    % Check CFL Condition
+    u_Tmax = max(abs(U_n(:)));
+    u_Rmax = max(abs(V_n(:)));
+    CFL_check = u_Rmax*dt/(dr) + u_Tmax*dt/(dT*RR(abs(V_n) == max(abs(V_n(:)))));
+    if CFL_check > 1
+       fprintf('CFL condition not met!\n'); 
+    end
 
     % Initialize Density
     phi_t = (PHI(:,:,iter) - PHI(:,:,iter-1))./dt;
@@ -90,7 +97,7 @@ while res(end) > tol % iterate through time
     v_avg = rho_ij;
     phi_t_avg = rho_ij;
     
-    for j = 2:(n_r) % assume same number of points in the radius direction
+    for j = 1:(n_r) % assume same number of points in the radius direction
         % looping through radius points
         % here, we want to determine density through all the radii except
         % for at the cylinder first, to account for the offset grid
@@ -117,9 +124,9 @@ while res(end) > tol % iterate through time
     end
     
     % Apply Neumann condition on velocities
-    u_avg(1,:) = u_avg(2,:);
-    v_avg(1,:) = v_avg(2,:);
-    phi_t_avg(1,:) = phi_t_avg(2,:);
+%     u_avg(1,:) = u_avg(2,:);
+%     v_avg(1,:) = v_avg(2,:);
+%     phi_t_avg(1,:) = phi_t_avg(2,:);
     
     % Calculate Local (Artificial) Viscosity
     q2_avg = u_avg.^2 + v_avg.^2; % total velocity

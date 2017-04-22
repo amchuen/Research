@@ -5,19 +5,19 @@ close all;
 %% SIM CONTROL PARAMS - GRID INITIALIZATION
 
 % Step Sizes
-dx = 0.05;
+dx = 0.02;
 dy = dx;
 dt = 0.001;
 
-alpha = 20;
+alpha = 35;
 
 % Airfoil Dimensions
 tau = 0.05;
 chord = 1.0;
 
 % Field Axis Values
-y_max = 3;
-x_max = 4.0;
+y_max = 10;
+x_max = 6.0;
 x_vals = (-2):dx:x_max;
 y_vals = 0:dy:y_max;
 [XX, YY] = meshgrid(x_vals, y_vals);
@@ -34,7 +34,7 @@ end
 
 % Fluid Params
 gam = 1.4; % heat 
-M0 = 0.99;
+M0 = 1.1;
 visc_on = 0;
 
 %% SIM CONTROL VARIABLE INITIALIZATION
@@ -46,7 +46,7 @@ PHI(:,:,2) = PHI(:,:,1);
 res = 1;
 ind = 0;
 iter = 1.0;
-tol = 1e-5;
+tol = 2e-5;
 
 % Boundary Conditions
 BC.Vy_II = zeros(size(YY(end,:)));
@@ -118,51 +118,51 @@ while (res(end) > tol)|| (iter < 100) % iterate through time
         fprintf('Incompressible Case not satisfied!\n');
     end
     
-    if M0 <= 1 % subsonic, use Elliptic Solver
-        for i = 2:(size(PHI,2)-1) % march along x-dir to calculate one step ahead, do not need to calculate initial inlet
-            for j = 1:(size(PHI,1)-1) % loop through y_dir, do not need to calculate for top BC
-                if j == 1 % applies either body or foil
-                    PHI_Y_1 = dyBdx(i);
-                else % everywhere else not on body
-                    PHI_Y_1 = (PHI(j,i,iter+1) - PHI(j-1,i,iter+1))/dy;
-                end
-
-                if i == size(PHI,2)
-                    RHO_i1 = 1;
-                else
-                    RHO_i1 = rho_ij(j,i) - eps_ij(j,i)*rho_ds(j,i); % use local viscosity at current node
-                end
-                RHO_i_1 = rho_ij(j,i-1) - eps_ij(j,i)*rho_ds(j,i-1);
-
-                PHI_YY = ((PHI(j+1,i,iter)-PHI(j,i,iter))/dy - PHI_Y_1)/dy;
-                PHI_XX = (RHO_i1*(PHI(j,i+1,iter) - PHI(j,i,iter))/dx - RHO_i_1*(PHI(j,i,iter) - PHI(j,i-1,iter))/dx)/dx;
-                PHI(j,i,iter+1) = (PHI_XX + PHI_YY + 2/(dt^2)*PHI(j,i,iter) - (1/dt^2 - 0.5*alpha/dt)*PHI(j,i,iter-1))/(1/dt^2 + 0.5*alpha/dt);
+%     if M0 <= 1 % subsonic, use Elliptic Solver
+    for i = 2:(size(PHI,2)-1) % march along x-dir to calculate one step ahead, do not need to calculate initial inlet
+        for j = 1:(size(PHI,1)-1) % loop through y_dir, do not need to calculate for top BC
+            if j == 1 % applies either body or foil
+                PHI_Y_1 = dyBdx(i);
+            else % everywhere else not on body
+                PHI_Y_1 = (PHI(j,i,iter+1) - PHI(j-1,i,iter+1))/dy;
             end
-        end
-    
-    elseif M0 > 1 % supersonic, use Hyperbolic Solver?
-    
-        for i = 2:(size(PHI,2)-1) % march along x-dir to calculate one step ahead, do not need to calculate initial inlet
-            for j = 1:(size(PHI,1)-1) % loop through y_dir, do not need to calculate for top BC
-                if j == 1 % applies either body or foil
-                    PHI_Y_1 = dyBdx(i+1);
-                else % everywhere else not on body
-                    PHI_Y_1 = (PHI(j,i+1,iter+1) - PHI(j-1,i+1,iter+1))/dy;
-                end
 
-                if i == size(PHI,2)
-                    RHO_i1 = 1;
-                else
-                    RHO_i1 = rho_ij(j,i) - eps_ij(j,i)*rho_ds(j,i);
-                end
-                RHO_i_1 = rho_ij(j,i-1) - eps_ij(j,i)*rho_ds(j,i-1);
-
-                PHI_YY = ((PHI(j+1,i+1,iter)-PHI(j,i+1,iter))/dy - PHI_Y_1)/dy;
-                PHI_XX = (RHO_i1*(PHI(j,i+1,iter) - PHI(j,i,iter))/dx - RHO_i_1*(PHI(j,i,iter) - PHI(j,i-1,iter))/dx)/dx;
-                PHI(j,i+1,iter+1) = (PHI_XX + PHI_YY + 2/(dt^2)*PHI(j,i+1,iter) - (1/dt^2 - 0.5*alpha/dt)*PHI(j,i+1,iter-1))/(1/dt^2 + 0.5*alpha/dt);
+            if i == size(PHI,2)
+                RHO_i1 = 1;
+            else
+                RHO_i1 = rho_ij(j,i) - eps_ij(j,i)*rho_ds(j,i); % use local viscosity at current node
             end
+            RHO_i_1 = rho_ij(j,i-1) - eps_ij(j,i)*rho_ds(j,i-1);
+
+            PHI_YY = ((PHI(j+1,i,iter)-PHI(j,i,iter))/dy - PHI_Y_1)/dy;
+            PHI_XX = (RHO_i1*(PHI(j,i+1,iter) - PHI(j,i,iter))/dx - RHO_i_1*(PHI(j,i,iter) - PHI(j,i-1,iter))/dx)/dx;
+            PHI(j,i,iter+1) = (PHI_XX + PHI_YY + 2/(dt^2)*PHI(j,i,iter) - (1/dt^2 - 0.5*alpha/dt)*PHI(j,i,iter-1))/(1/dt^2 + 0.5*alpha/dt);
         end
     end
+    
+%     elseif M0 > 1 % supersonic, use Hyperbolic Solver?
+%     
+%         for i = 2:(size(PHI,2)-1) % march along x-dir to calculate one step ahead, do not need to calculate initial inlet
+%             for j = 1:(size(PHI,1)-1) % loop through y_dir, do not need to calculate for top BC
+%                 if j == 1 % applies either body or foil
+%                     PHI_Y_1 = dyBdx(i+1);
+%                 else % everywhere else not on body
+%                     PHI_Y_1 = (PHI(j,i+1,iter+1) - PHI(j-1,i+1,iter+1))/dy;
+%                 end
+% 
+%                 if i == size(PHI,2)
+%                     RHO_i1 = 1;
+%                 else
+%                     RHO_i1 = rho_ij(j,i) - eps_ij(j,i)*rho_ds(j,i);
+%                 end
+%                 RHO_i_1 = rho_ij(j,i-1) - eps_ij(j,i)*rho_ds(j,i-1);
+% 
+%                 PHI_YY = ((PHI(j+1,i+1,iter)-PHI(j,i+1,iter))/dy - PHI_Y_1)/dy;
+%                 PHI_XX = (RHO_i1*(PHI(j,i+1,iter) - PHI(j,i,iter))/dx - RHO_i_1*(PHI(j,i,iter) - PHI(j,i-1,iter))/dx)/dx;
+%                 PHI(j,i+1,iter+1) = (PHI_XX + PHI_YY + 2/(dt^2)*PHI(j,i+1,iter) - (1/dt^2 - 0.5*alpha/dt)*PHI(j,i+1,iter-1))/(1/dt^2 + 0.5*alpha/dt);
+%             end
+%         end
+%     end
     
     % Run Residual Check
     difference = abs(PHI(:,:,iter+1) - PHI(:,:,iter));
@@ -185,7 +185,7 @@ end
 U_n(:,1) = BC.Vx_I;
 
 % Calculate uncorrected density 
-%     rho_ij = (1 - 0.5*(gam-1).*M0.^2.*(u_avg.^2 - 1)).^(1./(gam-1));
+%     rho_ij = (1 - 0.5*(gam-1).*M  0.^2.*(u_avg.^2 - 1)).^(1./(gam-1));
 rho_ij = (1 - 0.5*(gam-1).*M0.^2.*(U_n.^2 - 1)).^(1./(gam-1));
 a2_avg = (1./M0.^2)-0.5*(gam-1).*(U_n.^2 - 1);
 M_ij = U_n./sqrt(a2_avg);
