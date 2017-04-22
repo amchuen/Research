@@ -5,20 +5,20 @@ close all;
 %% SIM CONTROL PARAMS - GRID INITIALIZATION
 
 % Step Sizes
-dx = 0.1;
+dx = 0.05;
 dy = dx;
-dt = 0.1*dx;
+dt = 0.001;
 
-alpha = 25;
+alpha = 20;
 
 % Airfoil Dimensions
 tau = 0.05;
 chord = 1.0;
 
 % Field Axis Values
-y_max = 5;
-x_max = 6.0;
-x_vals = (-4):dx:x_max;
+y_max = 3;
+x_max = 4.0;
+x_vals = (-2):dx:x_max;
 y_vals = 0:dy:y_max;
 [XX, YY] = meshgrid(x_vals, y_vals);
 
@@ -34,7 +34,7 @@ end
 
 % Fluid Params
 gam = 1.4; % heat 
-M0 = 1.1;
+M0 = 0.99;
 visc_on = 0;
 
 %% SIM CONTROL VARIABLE INITIALIZATION
@@ -46,7 +46,7 @@ PHI(:,:,2) = PHI(:,:,1);
 res = 1;
 ind = 0;
 iter = 1.0;
-tol = 5e-5;
+tol = 1e-5;
 
 % Boundary Conditions
 BC.Vy_II = zeros(size(YY(end,:)));
@@ -57,7 +57,7 @@ BC.PHI_I = XX(:,1);
 
 %% START SOLUTION
 
-while (res(end) > tol) % iterate through time
+while (res(end) > tol)|| (iter < 100) % iterate through time
     
     % Initialize next time step
     if (iter > 500) && (mod(iter, 500) == 0)
@@ -70,16 +70,17 @@ while (res(end) > tol) % iterate through time
     
     % Apply boundary conditions
     PHI(:,1,iter+1) = BC.PHI_I; % inlet condition
-
-    % Initialize Density calculations
-    rho_ij = ones([size(XX,1), size(XX,2)-1]);
-    u_avg = diff(PHI(:,:,iter)')'./dx;
     
-    % Calculate Local Viscosity
-    a2_avg = (1./M0.^2)-0.5*(gam-1).*(u_avg.^2 - 1);
-    eps_ij = max(zeros(size(rho_ij)), 1 - 0.9.*(a2_avg./(u_avg.^2)));
+    % Calculate local viscosity at the nodes
+    U_n = ones(size(XX)); % PHI_X... only need velocity in X-dir
+    for i = 2:(size(XX, 2)-1) % loop through x-vals
+        U_n(:,i) = (PHI(:,i+1,iter) - PHI(:,i-1,iter))./(2.*dx);
+        % determine velocity at the far-field end?
+    end
+    U_n(:,1) = BC.Vx_I;
+    a2_ij = (1./M0.^2)-0.5*(gam-1).*(U_n.^2 - 1);
+    eps_ij = max(zeros(size(U_n)), 1 - 0.9.*(a2_ij./(U_n.^2)));
     
-    % Check if viscosity is being used
     if any(any(eps_ij ~= 0)) && (visc_on ==0) % viscosity not being used and then turned on
         visc_on = 1;
         fprintf('Viscosity model activated! Iteration: %i\n', iter);        
@@ -87,6 +88,11 @@ while (res(end) > tol) % iterate through time
         visc_on = 0;
         fprintf('Viscosity model turned off! Iteration: %i\n', iter);
     end
+
+    % Initialize Density calculations using between grid in X-dir
+    u_avg = diff(PHI(:,:,iter)')'./dx;
+    a2_avg = (1./M0.^2)-0.5*(gam-1).*(u_avg.^2 - 1);
+%     eps_ij = max(zeros(size(rho_ij)), 1 - 0.9.*(a2_avg./(u_avg.^2)));
     
     rho_ij = (1 - 0.5*(gam-1).*M0.^2.*(u_avg.^2 - 1)).^(1./(gam-1));
     
@@ -98,42 +104,72 @@ while (res(end) > tol) % iterate through time
     rho_ds = zeros(size(rho_ij));
     for i = 1:(size(rho_ij,2)) % loop through x-dir
         if i ==1 % Dirichlet BC
-            rho_ds(:,i) = rho_ij(:,i)-ones(size(rho_ij(:,i)));
+            rho_ds(:,i) = 0.5*(rho_ij(:,i+1)-ones(size(rho_ij(:,i)))) - 0.5.*sign(u_avg(:,i)).*(rho_ij(:,i+1)-2.*rho_ij(:,i) + ones(size(rho_ij(:,i))));
+        elseif i == size(rho_ij,2)
+            rho_ds(:,i) = 0.5*(-rho_ij(:,i-1)+ones(size(rho_ij(:,i)))) - 0.5.*sign(u_avg(:,i)).*(rho_ij(:,i-1)-2.*rho_ij(:,i) + ones(size(rho_ij(:,i))));
         else
-            rho_ds(:,i) = rho_ij(:,i)-rho_ij(:,i-1);
+            rho_ds(:,i) = 0.5*(rho_ij(:,i+1)-rho_ij(:,i-1)) - 0.5.*sign(u_avg(:,i)).*(rho_ij(:,i+1)-2.*rho_ij(:,i) + rho_ij(:,i-1));
         end
     end
     
-    RHO = rho_ij - eps_ij.*rho_ds;
+%     rho_ij = rho_ij - eps_ij.*rho_ds;
         
-    if (M0 == 0) && any(any(RHO ~= 1))
+    if (M0 == 0) && any(any(rho_ij ~= 1))
         fprintf('Incompressible Case not satisfied!\n');
     end
     
-    for i = 2:(size(PHI,2)-1) % march along x-dir to calculate one step ahead, do not need to calculate initial inlet
-        for j = 1:(size(PHI,1)-1) % loop through y_dir, do not need to calculate for top BC
-            if j == 1 % applies either body or foil
-                PHI_Y_1 = dyBdx(i);
-            else % everywhere else not on body
-                PHI_Y_1 = (PHI(j,i,iter+1) - PHI(j-1,i,iter+1))/dy;
+    if M0 <= 1 % subsonic, use Elliptic Solver
+        for i = 2:(size(PHI,2)-1) % march along x-dir to calculate one step ahead, do not need to calculate initial inlet
+            for j = 1:(size(PHI,1)-1) % loop through y_dir, do not need to calculate for top BC
+                if j == 1 % applies either body or foil
+                    PHI_Y_1 = dyBdx(i);
+                else % everywhere else not on body
+                    PHI_Y_1 = (PHI(j,i,iter+1) - PHI(j-1,i,iter+1))/dy;
+                end
+
+                if i == size(PHI,2)
+                    RHO_i1 = 1;
+                else
+                    RHO_i1 = rho_ij(j,i) - eps_ij(j,i)*rho_ds(j,i); % use local viscosity at current node
+                end
+                RHO_i_1 = rho_ij(j,i-1) - eps_ij(j,i)*rho_ds(j,i-1);
+
+                PHI_YY = ((PHI(j+1,i,iter)-PHI(j,i,iter))/dy - PHI_Y_1)/dy;
+                PHI_XX = (RHO_i1*(PHI(j,i+1,iter) - PHI(j,i,iter))/dx - RHO_i_1*(PHI(j,i,iter) - PHI(j,i-1,iter))/dx)/dx;
+                PHI(j,i,iter+1) = (PHI_XX + PHI_YY + 2/(dt^2)*PHI(j,i,iter) - (1/dt^2 - 0.5*alpha/dt)*PHI(j,i,iter-1))/(1/dt^2 + 0.5*alpha/dt);
             end
-            
-            if i == size(PHI,2)
-                RHO_i1 = 1;
-            else
-                RHO_i1 = RHO(j,i);
+        end
+    
+    elseif M0 > 1 % supersonic, use Hyperbolic Solver?
+    
+        for i = 2:(size(PHI,2)-1) % march along x-dir to calculate one step ahead, do not need to calculate initial inlet
+            for j = 1:(size(PHI,1)-1) % loop through y_dir, do not need to calculate for top BC
+                if j == 1 % applies either body or foil
+                    PHI_Y_1 = dyBdx(i+1);
+                else % everywhere else not on body
+                    PHI_Y_1 = (PHI(j,i+1,iter+1) - PHI(j-1,i+1,iter+1))/dy;
+                end
+
+                if i == size(PHI,2)
+                    RHO_i1 = 1;
+                else
+                    RHO_i1 = rho_ij(j,i) - eps_ij(j,i)*rho_ds(j,i);
+                end
+                RHO_i_1 = rho_ij(j,i-1) - eps_ij(j,i)*rho_ds(j,i-1);
+
+                PHI_YY = ((PHI(j+1,i+1,iter)-PHI(j,i+1,iter))/dy - PHI_Y_1)/dy;
+                PHI_XX = (RHO_i1*(PHI(j,i+1,iter) - PHI(j,i,iter))/dx - RHO_i_1*(PHI(j,i,iter) - PHI(j,i-1,iter))/dx)/dx;
+                PHI(j,i+1,iter+1) = (PHI_XX + PHI_YY + 2/(dt^2)*PHI(j,i+1,iter) - (1/dt^2 - 0.5*alpha/dt)*PHI(j,i+1,iter-1))/(1/dt^2 + 0.5*alpha/dt);
             end
-            RHO_i_1 = RHO(j,i-1);
-            
-            PHI_YY = ((PHI(j+1,i,iter)-PHI(j,i,iter))/dy - PHI_Y_1)/dy;
-            PHI_XX = (RHO_i1*(PHI(j,i+1,iter) - PHI(j,i,iter))/dx - RHO_i_1*(PHI(j,i,iter) - PHI(j,i-1,iter))/dx)/dx;
-            PHI(j,i,iter+1) = (PHI_XX + PHI_YY + 2/(dt^2)*PHI(j,i,iter) - (1/dt^2 - 0.5*alpha/dt)*PHI(j,i,iter-1))/(1/dt^2 + 0.5*alpha/dt);
         end
     end
     
     % Run Residual Check
     difference = abs(PHI(:,:,iter+1) - PHI(:,:,iter));
     [res(iter), ind(iter)] = max(difference(:));
+%     if iter <= 20
+%         res(iter) = 1; % let calculation iterate a few times to determine convergence
+%     end
     
 end
 
@@ -193,6 +229,7 @@ xlabel('\theta');
 ylabel('C_p');
 title('C_p on surface of airfoil');
 set(gca, 'Ydir', 'reverse');
+% axis equal
 saveas(gcf, [pwd '\airfoil\' folderName '\cp_surf.png']);
 saveas(gcf, [pwd '\airfoil\' folderName '\cp_surf']);
 
