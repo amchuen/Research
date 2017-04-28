@@ -49,3 +49,4 @@ Temporary Items
 *.fig
 Reports/Winter_Report.aux
 *.log
+*.mat
