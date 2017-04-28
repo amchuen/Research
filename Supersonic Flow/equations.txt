@@ -1,0 +1,16 @@
+% Governing Equations
+\dfrac{\partial \rho}{\partial t} + \nabla \cdot \left(\rho u \right ) = 0\\ \\
+\left(\rho \Phi_x \right )_x + \left(\rho \Phi_y \right )_y = 0\\
+\rho_{\infty}\left(1 - \dfrac{\gamma - 1}{2}M_{\infty}\left(\Phi^2_x + \Phi^2_y - 1 \right ) \right )^{\frac{1}{\gamma - 1}} = \rho
+
+% Elliptic Stencil
+\dfrac{\rho_{i+0.5,j}\frac{\left(\Phi_{i+1,j} - \Phi_{i,j}\right)}{dx} - \rho_{i-0.5,j}\frac{\left(\Phi_{i,j} - \Phi_{i-1,j} \right)}{dx} }{dx} + \frac{\rho_{i,j+0.5}\frac{\left(\Phi_{i,j+1} - \Phi_{i,j}\right)}{dy} - \rho_{i,j-0.5}\frac{\left(\Phi_{i,j} - \Phi_{i,j-1} \right)}{dy} }{dy}
+
+% Viscosity Scheme
+\tilde{\rho} = \rho + \mu\Delta\left(\rho s \right )
+
+% Pseudo Transient Time Continuation
+\Phi_{tt} + \alpha \Phi_{t} = \dfrac{1}{r}\left(\rho r \Phi_{r} \right )_{r} + \dfrac{1}{r^2}\left(\rho\Phi_{\theta} \right )_{\theta}
+
+% Density only in x direction
+\left(\rho \Phi_x\right)_x + \Phi_{yy} = 0

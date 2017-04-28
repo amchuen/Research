@@ -5,20 +5,21 @@ close all;
 %% SIM CONTROL PARAMS - GRID INITIALIZATION
 
 % Step Sizes
-dx = 0.02;
-dy = dx;
-dt = 0.001;
+dx = 0.05;
+dy = 0.08;
+dt = 0.01;
 
-alpha = 35;
+alpha = 15;
 
 % Airfoil Dimensions
 tau = 0.05;
 chord = 1.0;
 
 % Field Axis Values
-y_max = 10;
-x_max = 6.0;
-x_vals = (-2):dx:x_max;
+y_max = 5;%dy*49;
+x_max = 11;%1 + 20*dx;
+x_min = -4;%(-19*dx);
+x_vals = x_min:dx:x_max;
 y_vals = 0:dy:y_max;
 [XX, YY] = meshgrid(x_vals, y_vals);
 
@@ -34,52 +35,55 @@ end
 
 % Fluid Params
 gam = 1.4; % heat 
-M0 = 1.1;
+M0 = 0.98;
 visc_on = 0;
+v_coeff = 1.0;
 
 %% SIM CONTROL VARIABLE INITIALIZATION
 
-PHI = zeros([size(XX), 2]);
-PHI(:,:,1) = XX;
-PHI(:,:,2) = PHI(:,:,1);
-[n_r, n_T] = size(XX);
+PHI_old = zeros([size(XX), 2]);
+PHI_old(:,:,1) = XX;
+PHI_old(:,:,2) = PHI_old(:,:,1);
+PHI_new = PHI_old(:,:,2);
 res = 1;
 ind = 0;
 iter = 1.0;
-tol = 2e-5;
+tol = 0.5e-5;
 
 % Boundary Conditions
 BC.Vy_II = zeros(size(YY(end,:)));
 BC.Vx_II = ones(size(XX(end,:)));
 BC.Vx_I = ones(size(XX(:,1)));
-% BC.PHI_II = XX(end,:);
+BC.PHI_II = XX(end,:);
 BC.PHI_I = XX(:,1);
+
+mid = [-1/(dy^2), (-2/dy^2).*ones(1, length(y_vals)-2), 0];
+top = (1/dy^2).*ones(1, length(y_vals)-1);
+bot = [(1/dy^2).*ones(1, length(y_vals)-2), 0];
+
+sys_yy = diag(mid) + diag(top, 1) + diag(bot, -1);
 
 %% START SOLUTION
 
 while (res(end) > tol)|| (iter < 100) % iterate through time
     
-    % Initialize next time step
-    if (iter > 500) && (mod(iter, 500) == 0)
-        fprintf('Iteration Ct: %i\n', iter);
-        fprintf('Current Residual: %0.5f\n', res(end));
-        figure(1);semilogy(1:iter, res);
-    end
-    iter = iter + 1; % use this to call nth time step
-    PHI(:,:,iter+1) = PHI(:,:,iter); % setup n+1th time step 
+    % Reorganize three-level scheme
+    PHI_old(:,:,1) = PHI_old(:,:,2);
+    PHI_old(:,:,2) = PHI_new;
+%     PHI_new(:,:) = PHI_old(:,:,2); % setup n+1th time step 
     
     % Apply boundary conditions
-    PHI(:,1,iter+1) = BC.PHI_I; % inlet condition
+    PHI_new(:,1) = BC.PHI_I; % inlet condition
     
     % Calculate local viscosity at the nodes
     U_n = ones(size(XX)); % PHI_X... only need velocity in X-dir
     for i = 2:(size(XX, 2)-1) % loop through x-vals
-        U_n(:,i) = (PHI(:,i+1,iter) - PHI(:,i-1,iter))./(2.*dx);
+        U_n(:,i) = (PHI_old(:,i+1,2) - PHI_old(:,i-1,2))./(2.*dx);
         % determine velocity at the far-field end?
     end
     U_n(:,1) = BC.Vx_I;
     a2_ij = (1./M0.^2)-0.5*(gam-1).*(U_n.^2 - 1);
-    eps_ij = max(zeros(size(U_n)), 1 - 0.9.*(a2_ij./(U_n.^2)));
+    eps_ij = 1.2.*max(zeros(size(U_n)), 1 - 1.0.*(a2_ij./(U_n.^2)));
     
     if any(any(eps_ij ~= 0)) && (visc_on ==0) % viscosity not being used and then turned on
         visc_on = 1;
@@ -90,7 +94,7 @@ while (res(end) > tol)|| (iter < 100) % iterate through time
     end
 
     % Initialize Density calculations using between grid in X-dir
-    u_avg = diff(PHI(:,:,iter)')'./dx;
+    u_avg = diff(PHI_old(:,:,2)')'./dx;
     a2_avg = (1./M0.^2)-0.5*(gam-1).*(u_avg.^2 - 1);
 %     eps_ij = max(zeros(size(rho_ij)), 1 - 0.9.*(a2_avg./(u_avg.^2)));
     
@@ -118,59 +122,63 @@ while (res(end) > tol)|| (iter < 100) % iterate through time
         fprintf('Incompressible Case not satisfied!\n');
     end
     
-%     if M0 <= 1 % subsonic, use Elliptic Solver
-    for i = 2:(size(PHI,2)-1) % march along x-dir to calculate one step ahead, do not need to calculate initial inlet
-        for j = 1:(size(PHI,1)-1) % loop through y_dir, do not need to calculate for top BC
-            if j == 1 % applies either body or foil
-                PHI_Y_1 = dyBdx(i);
-            else % everywhere else not on body
-                PHI_Y_1 = (PHI(j,i,iter+1) - PHI(j-1,i,iter+1))/dy;
-            end
-
-            if i == size(PHI,2)
-                RHO_i1 = 1;
+    if M0 <= 1 % subsonic, use Elliptic Solver
+        for i = 2:(size(PHI_old,2)-1) % march along x-dir to calculate one step ahead, do not need to calculate initial inlet
+            % Get Density
+            if i == size(PHI_old,2)
+                RHO_i1 = ones(size(rho_ij(:,i)));
             else
-                RHO_i1 = rho_ij(j,i) - eps_ij(j,i)*rho_ds(j,i); % use local viscosity at current node
+                RHO_i1 = rho_ij(:,i) - v_coeff.*eps_ij(:,i).*rho_ds(:,i); % use local viscosity at current node
             end
-            RHO_i_1 = rho_ij(j,i-1) - eps_ij(j,i)*rho_ds(j,i-1);
+            RHO_i_1 = rho_ij(:,i-1) - v_coeff.*eps_ij(:,i).*rho_ds(:,i-1);
+            
+            PHI_XX = (RHO_i1.*(PHI_old(:,i+1,2) - PHI_old(:,i,2))./dx - RHO_i_1.*(PHI_old(:,i,2) - PHI_old(:,i-1,2))./dx)./dx;
+            
+            PHI_YY = sys_yy*PHI_old(:,i,2) - (1/dy).*[dyBdx(i); zeros(length(y_vals)-1, 1)];
+            
+            PHI_new(:,i) = (PHI_XX + PHI_YY + 2/(dt^2)*PHI_old(:,i,2) - (1/dt^2 - 0.5*alpha/dt)*PHI_old(:,i,1))/(1/dt^2 + 0.5*alpha/dt);
+        end
+        
+        PHI_new(end,:) = BC.PHI_II;
+    
+    elseif M0 > 1 % supersonic, use Hyperbolic Solver?
+    
+        for i = 3:(size(PHI_old,2)) % march along x-dir to calculate one step ahead, do not need to calculate initial inlet
+            if i == size(PHI_old,2)
+                RHO_i1 = rho_ij(:,i-1) - v_coeff.*eps_ij(:,i).*rho_ds(:,i-1); % use local viscosity at current node
+                RHO_i_1 = rho_ij(:,i-2) - v_coeff.*eps_ij(:,i).*rho_ds(:,i-2);
+                
+                PHI_XX = (RHO_i1.*(PHI_old(:,i,2) - PHI_old(:,i-1,2))./dx - RHO_i_1.*(PHI_old(:,i-1,2) - PHI_old(:,i-2,2))./dx)./dx;
+                PHI_YY = sys_yy*PHI_old(:,i,2) - (1/dy).*[dyBdx(i); zeros(length(y_vals)-1, 1)];
 
-            PHI_YY = ((PHI(j+1,i,iter)-PHI(j,i,iter))/dy - PHI_Y_1)/dy;
-            PHI_XX = (RHO_i1*(PHI(j,i+1,iter) - PHI(j,i,iter))/dx - RHO_i_1*(PHI(j,i,iter) - PHI(j,i-1,iter))/dx)/dx;
-            PHI(j,i,iter+1) = (PHI_XX + PHI_YY + 2/(dt^2)*PHI(j,i,iter) - (1/dt^2 - 0.5*alpha/dt)*PHI(j,i,iter-1))/(1/dt^2 + 0.5*alpha/dt);
+                PHI_new(:,i) = (PHI_XX + PHI_YY + 2/(dt^2)*PHI_old(:,i,2) - (1/dt^2 - 0.5*alpha/dt)*PHI_old(:,i,1))/(1/dt^2 + 0.5*alpha/dt);
+%                 PHI_new(:,i) = PHI_new(:,i-1);
+            else % start from line three
+                
+                RHO_i1 = rho_ij(:,i) - v_coeff.*eps_ij(:,i).*rho_ds(:,i); % use local viscosity at current node
+                RHO_i_1 = rho_ij(:,i-1) - v_coeff.*eps_ij(:,i).*rho_ds(:,i-1);
+
+                PHI_XX = (RHO_i1.*(PHI_old(:,i+1,2) - PHI_old(:,i,2))./dx - RHO_i_1.*(PHI_old(:,i,2) - PHI_old(:,i-1,2))./dx)./dx;
+            
+                PHI_YY = sys_yy*PHI_old(:,i,2) - (1/dy).*[dyBdx(i); zeros(length(y_vals)-1, 1)];
+
+                PHI_new(:,i) = (PHI_XX + PHI_YY + 2/(dt^2)*PHI_old(:,i,2) - (1/dt^2 - 0.5*alpha/dt)*PHI_old(:,i,1))/(1/dt^2 + 0.5*alpha/dt);
+            end
         end
     end
     
-%     elseif M0 > 1 % supersonic, use Hyperbolic Solver?
-%     
-%         for i = 2:(size(PHI,2)-1) % march along x-dir to calculate one step ahead, do not need to calculate initial inlet
-%             for j = 1:(size(PHI,1)-1) % loop through y_dir, do not need to calculate for top BC
-%                 if j == 1 % applies either body or foil
-%                     PHI_Y_1 = dyBdx(i+1);
-%                 else % everywhere else not on body
-%                     PHI_Y_1 = (PHI(j,i+1,iter+1) - PHI(j-1,i+1,iter+1))/dy;
-%                 end
-% 
-%                 if i == size(PHI,2)
-%                     RHO_i1 = 1;
-%                 else
-%                     RHO_i1 = rho_ij(j,i) - eps_ij(j,i)*rho_ds(j,i);
-%                 end
-%                 RHO_i_1 = rho_ij(j,i-1) - eps_ij(j,i)*rho_ds(j,i-1);
-% 
-%                 PHI_YY = ((PHI(j+1,i+1,iter)-PHI(j,i+1,iter))/dy - PHI_Y_1)/dy;
-%                 PHI_XX = (RHO_i1*(PHI(j,i+1,iter) - PHI(j,i,iter))/dx - RHO_i_1*(PHI(j,i,iter) - PHI(j,i-1,iter))/dx)/dx;
-%                 PHI(j,i+1,iter+1) = (PHI_XX + PHI_YY + 2/(dt^2)*PHI(j,i+1,iter) - (1/dt^2 - 0.5*alpha/dt)*PHI(j,i+1,iter-1))/(1/dt^2 + 0.5*alpha/dt);
-%             end
-%         end
-%     end
-    
     % Run Residual Check
-    difference = abs(PHI(:,:,iter+1) - PHI(:,:,iter));
+    difference = abs(PHI_new(:,:) - PHI_old(:,:,2));
     [res(iter), ind(iter)] = max(difference(:));
-%     if iter <= 20
-%         res(iter) = 1; % let calculation iterate a few times to determine convergence
-%     end
     
+    % Initialize next time step
+    if (iter > 500) && (mod(iter, 500) == 0)
+        fprintf('Iteration Ct: %i\n', iter);
+        fprintf('Current Residual: %0.5f\n', res(end));
+        figure(1);semilogy(1:iter, res);
+    end
+    iter = iter + 1; % use this to call nth time step
+
 end
 
 %% Post Process
@@ -179,7 +187,7 @@ end
 U_n = ones(size(XX)); % PHI_X... only need velocity in X-dir
 
 for i = 2:(size(XX, 2)-1) % loop through x-vals
-    U_n(:,i) = (PHI(:,i+1,iter) - PHI(:,i-1,iter))./(2.*dx);
+    U_n(:,i) = (PHI_new(:,i+1) - PHI_new(:,i-1))./(2.*dx);
     % determine velocity at the far-field end?
 end
 U_n(:,1) = BC.Vx_I;
@@ -198,7 +206,7 @@ if ~exist([pwd '\airfoil\' folderName], 'dir')
 end
 
 close all;
-figure(1);semilogy(1:iter, res);
+figure(1);semilogy(1:length(res), res);
 title('Residual Plot');
 xlabel('# of iterations');
 ylabel('Residual (Error)');
@@ -222,9 +230,10 @@ axis equal
 saveas(gcf, [pwd '\airfoil\' folderName '\cp_contour.png']);
 saveas(gcf, [pwd '\airfoil\' folderName '\cp_contour']);
 
+%% Surface CP
 figure();
 plot(XX(1,:), 1 - U_n(1,:).^2);
-xlabel('\theta');
+xlabel('X');
 %     ylabel('\phi_{\theta}');
 ylabel('C_p');
 title('C_p on surface of airfoil');
@@ -233,8 +242,10 @@ set(gca, 'Ydir', 'reverse');
 saveas(gcf, [pwd '\airfoil\' folderName '\cp_surf.png']);
 saveas(gcf, [pwd '\airfoil\' folderName '\cp_surf']);
 
+
+%% 
 figure(); % field potential
-contourf(XX, YY, PHI(:,:,end), 50);
+contourf(XX, YY, PHI_new(:,:,end), 50);
 title('Field Potential, \Phi');
 colorbar('eastoutside');
 axis equal
@@ -243,7 +254,7 @@ saveas(gcf, [pwd '\airfoil\' folderName '\phi_pot']);
 
 figure(); % theta-dir velocity plots
 contourf(XX, YY, U_n, 50); %./((RR.*cos(TT)).^2)
-title('\Phi_\theta velocity');
+title('\Phi_X velocity');
 colorbar('eastoutside');
 saveas(gcf, [pwd '\airfoil\' folderName '\phi_theta.png']);
 saveas(gcf, [pwd '\airfoil\' folderName '\phi_theta']);
@@ -255,3 +266,6 @@ colorbar('eastoutside');
 axis equal
 saveas(gcf, [pwd '\airfoil\' folderName '\mach.png']);
 saveas(gcf, [pwd '\airfoil\' folderName '\mach']);
+
+%% Save Results
+save([pwd '\airfoil\' folderName '\results.mat']);

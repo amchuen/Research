@@ -33,6 +33,7 @@ YY = RR .* sin(TT);
 gam = 1.4; % heat 
 M0 = 0.53;
 visc = 0.0;
+e_coeff = 1.3;
 
 %% FIELD VARIABLE INITIALIZATION
 
@@ -267,10 +268,10 @@ while res(end) > tol % iterate through time
             
             % Density Averages  -> USE VICOSITY AT NODE IJ INSTEAD OF
             % IN-BETWEEN GRID! (Jameson)
-            RHO_I1J = RHO_Tavg(j0,i1r) - eps_ij(j0,i0)*RHO_dsT(j0,i1r);
-            RHO_I_1J = RHO_Tavg(j0,i_1r) - eps_ij(j0,i0)*RHO_dsT(j0,i_1r);
-            RHO_IJ1 = RHO_Ravg(j1,i0) - eps_ij(j0,i0)*RHO_dsR(j1,i0);
-            RHO_IJ_1 = RHO_Ravg(j0,i0) - eps_ij(j0,i0)*RHO_dsR(j0,i0);
+            RHO_I1J = RHO_Tavg(j0,i1r) - e_coeff*eps_ij(j0,i0)*RHO_dsT(j0,i1r);
+            RHO_I_1J = RHO_Tavg(j0,i_1r) - e_coeff*eps_ij(j0,i0)*RHO_dsT(j0,i_1r);
+            RHO_IJ1 = RHO_Ravg(j1,i0) - e_coeff*eps_ij(j0,i0)*RHO_dsR(j1,i0);
+            RHO_IJ_1 = RHO_Ravg(j0,i0) - e_coeff*eps_ij(j0,i0)*RHO_dsR(j0,i0);
             
             if j == 1
                 PHI_RR = (RR_j1*RHO_IJ1*(PHI(j1,i0,iter) - PHI(j0,i0,iter))/dr)/(RR(j0,i0)*dr);
@@ -384,3 +385,6 @@ colorbar('eastoutside');
 axis equal
 saveas(gcf, [pwd '\cylinder\' folderName '\mach.png']);
 saveas(gcf, [pwd '\cylinder\' folderName '\mach']);
+
+%% Save Results
+save([pwd '\cylinder\' folderName '\results.mat']);
