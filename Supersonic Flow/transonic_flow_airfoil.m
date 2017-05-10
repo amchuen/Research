@@ -5,14 +5,14 @@ close all;
 %% SIM CONTROL PARAMS - GRID INITIALIZATION
 
 % Step Sizes
-dx = 0.05;
-dy = 0.08;
-dt = 0.01;
+dx = 0.01;
+dy = 0.05;
+dt = 0.005;
 
-alpha = 15;
+alpha = 70;
 
 % Airfoil Dimensions
-tau = 0.05;
+tau = 0.1;
 chord = 1.0;
 
 % Field Axis Values
@@ -35,9 +35,9 @@ end
 
 % Fluid Params
 gam = 1.4; % heat 
-M0 = 0.98;
+M0 = 0.99;
 visc_on = 0;
-v_coeff = 1.0;
+v_coeff = 1;
 
 %% SIM CONTROL VARIABLE INITIALIZATION
 
@@ -48,7 +48,7 @@ PHI_new = PHI_old(:,:,2);
 res = 1;
 ind = 0;
 iter = 1.0;
-tol = 0.5e-5;
+tol = 1e-5;
 
 % Boundary Conditions
 BC.Vy_II = zeros(size(YY(end,:)));
@@ -70,7 +70,6 @@ while (res(end) > tol)|| (iter < 100) % iterate through time
     % Reorganize three-level scheme
     PHI_old(:,:,1) = PHI_old(:,:,2);
     PHI_old(:,:,2) = PHI_new;
-%     PHI_new(:,:) = PHI_old(:,:,2); % setup n+1th time step 
     
     % Apply boundary conditions
     PHI_new(:,1) = BC.PHI_I; % inlet condition
@@ -79,7 +78,6 @@ while (res(end) > tol)|| (iter < 100) % iterate through time
     U_n = ones(size(XX)); % PHI_X... only need velocity in X-dir
     for i = 2:(size(XX, 2)-1) % loop through x-vals
         U_n(:,i) = (PHI_old(:,i+1,2) - PHI_old(:,i-1,2))./(2.*dx);
-        % determine velocity at the far-field end?
     end
     U_n(:,1) = BC.Vx_I;
     a2_ij = (1./M0.^2)-0.5*(gam-1).*(U_n.^2 - 1);
@@ -95,10 +93,8 @@ while (res(end) > tol)|| (iter < 100) % iterate through time
 
     % Initialize Density calculations using between grid in X-dir
     u_avg = diff(PHI_old(:,:,2)')'./dx;
-    a2_avg = (1./M0.^2)-0.5*(gam-1).*(u_avg.^2 - 1);
-%     eps_ij = max(zeros(size(rho_ij)), 1 - 0.9.*(a2_avg./(u_avg.^2)));
-    
-    rho_ij = (1 - 0.5*(gam-1).*M0.^2.*(u_avg.^2 - 1)).^(1./(gam-1));
+        
+    rho_ij = (1 - 0.5*(gam-1).*M0.^2.*(u_avg.^2 - 1)).^(1./(gam-1)); % do I need the time correction?
     
     if any(any((1 - 0.5*(gam-1).*M0.^2.*(u_avg.^2 - 1))<0))
        fprintf('Non-real result for density!\n'); 
@@ -115,9 +111,7 @@ while (res(end) > tol)|| (iter < 100) % iterate through time
             rho_ds(:,i) = 0.5*(rho_ij(:,i+1)-rho_ij(:,i-1)) - 0.5.*sign(u_avg(:,i)).*(rho_ij(:,i+1)-2.*rho_ij(:,i) + rho_ij(:,i-1));
         end
     end
-    
-%     rho_ij = rho_ij - eps_ij.*rho_ds;
-        
+            
     if (M0 == 0) && any(any(rho_ij ~= 1))
         fprintf('Incompressible Case not satisfied!\n');
     end
@@ -182,7 +176,8 @@ while (res(end) > tol)|| (iter < 100) % iterate through time
 end
 
 %% Post Process
-
+xmin = -2;
+xmax = 4;
 % Calculate Density from previous sweep through field (lagging?)
 U_n = ones(size(XX)); % PHI_X... only need velocity in X-dir
 
@@ -215,7 +210,7 @@ saveas(gcf, [pwd '\airfoil\' folderName '\residual_plot.png']);
 saveas(gcf, [pwd '\airfoil\' folderName '\residual_plot']);
 
 % plot density
-figure();contourf(XX,YY,rho_ij, 50)
+figure();contourf(XX(:,(x_vals>xmin & x_vals<xmax)),YY(:,(x_vals>xmin & x_vals<xmax)),rho_ij(:,(x_vals>xmin & x_vals<xmax)), 50)
 title('Density (Normalized)');
 colorbar('eastoutside');
 axis equal
@@ -223,7 +218,7 @@ saveas(gcf, [pwd '\airfoil\' folderName '\density.png']);
 saveas(gcf, [pwd '\airfoil\' folderName '\density']);
 
 figure(); % cp plots
-contourf(XX, YY, 1-(U_n.^2), 50); %./((RR.*cos(TT)).^2)
+contourf(XX(:,(x_vals>xmin & x_vals<xmax)), YY(:,(x_vals>xmin & x_vals<xmax)), 1-(U_n(:,(x_vals>xmin & x_vals<xmax)).^2), 50); %./((RR.*cos(TT)).^2)
 title('Pressure Coefficient Contours');
 colorbar('eastoutside');
 axis equal
@@ -232,7 +227,7 @@ saveas(gcf, [pwd '\airfoil\' folderName '\cp_contour']);
 
 %% Surface CP
 figure();
-plot(XX(1,:), 1 - U_n(1,:).^2);
+plot(XX(1,(x_vals>xmin & x_vals<xmax)), 1 - U_n(1,(x_vals>xmin & x_vals<xmax)).^2);
 xlabel('X');
 %     ylabel('\phi_{\theta}');
 ylabel('C_p');
@@ -244,8 +239,9 @@ saveas(gcf, [pwd '\airfoil\' folderName '\cp_surf']);
 
 
 %% 
+
 figure(); % field potential
-contourf(XX, YY, PHI_new(:,:,end), 50);
+contourf(XX(:,(x_vals>xmin & x_vals<xmax)), YY(:,(x_vals>xmin & x_vals<xmax)), PHI_new(:,(x_vals>xmin & x_vals<xmax),end), 50);
 title('Field Potential, \Phi');
 colorbar('eastoutside');
 axis equal
@@ -253,14 +249,15 @@ saveas(gcf, [pwd '\airfoil\' folderName '\phi_pot.png']);
 saveas(gcf, [pwd '\airfoil\' folderName '\phi_pot']);
 
 figure(); % theta-dir velocity plots
-contourf(XX, YY, U_n, 50); %./((RR.*cos(TT)).^2)
+contourf(XX(:,(x_vals>xmin & x_vals<xmax)), YY(:,(x_vals>xmin & x_vals<xmax)), U_n(:,(x_vals>xmin & x_vals<xmax)), 50); %./((RR.*cos(TT)).^2)
 title('\Phi_X velocity');
 colorbar('eastoutside');
+axis equal
 saveas(gcf, [pwd '\airfoil\' folderName '\phi_theta.png']);
 saveas(gcf, [pwd '\airfoil\' folderName '\phi_theta']);
 
 figure();
-contourf(XX, YY, M_ij, 50);
+contourf(XX(:,(x_vals>xmin & x_vals<xmax)), YY(:,(x_vals>xmin & x_vals<xmax)), M_ij(:,(x_vals>xmin & x_vals<xmax)), 50);
 title('Mach Number');
 colorbar('eastoutside');
 axis equal
