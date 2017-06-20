@@ -51,15 +51,18 @@ BC.dirichlet.PHI_II = (RR(end,:) + (r_cyl^2)./(RR(end,:))).*cos(TT(end,:));
 visc_on = 0;
 
 %% START SOLUTION
-
+tic
 while res(end) > tol % iterate through time
     
     % Initialize next time step
-    if (iter > 500) && (mod(iter, 500) == 0)
-        fprintf('Iteration Ct: %i\n', iter);
+    if (length(res) > 500) && (mod(length(res), 500) == 0)
+        fprintf('Iteration Ct: %i\n', length(res));
         fprintf('Current Residual: %0.5f\n', res(end));
-        figure(1);semilogy(1:iter, res);
+        toc;
+        figure(1);semilogy(1:length(res), res);
+        fprintf('\n');
     end
+
     iter = iter + 1; % use this to call nth time step
     PHI(:,:,iter+1) = PHI(:,:,iter); % setup n+1th time step
     
@@ -124,6 +127,12 @@ while res(end) > tol % iterate through time
         end
     end
     
+%     test = [(PHI(1,2:end,iter) - PHI(1,1:(end-1),iter))./(RR(1,1:(end-1)).*dT);...
+% 			0.5.*((PHI(2:end,2:end,iter) - PHI(2:end,1:(end-1),iter))./(RR(2:end,1:(end-1)).*dT) + (PHI(1:(end-1),2:(end),iter) - PHI(1:(end-1),1:(end-1),iter))./(RR(1:(end-1),1:(end-1)).*dT))];
+
+%     test = [0.5.*([phi_t(1, 1:(end-1))+ phi_t(1, 2:end)]);...
+% 				0.25.*([phi_t(2:end, 1:(end-1)) + phi_t(1:(end-1), 1:(end-1)) + phi_t(1:(end-1), 2:end) + phi_t(2:end, 2:end)])];
+    
     % Apply Neumann condition on velocities
 %     u_avg(1,:) = u_avg(2,:);
 %     v_avg(1,:) = v_avg(2,:);
@@ -165,12 +174,12 @@ while res(end) > tol % iterate through time
         if ii ==1 % Neumann BC
             del_rho_dr(ii,:) = 0.5*(rho_ij(ii+1,:) - rho_ij(ii,:))-0.5.*(sign(v_avg(ii,:))).*(rho_ij(ii+1,:)-rho_ij(ii,:));
         elseif ii == size(rho_ij,1) % Dirichlet BC
-            del_rho_dr(ii,:) = 0.5*(ones(size(rho_ij(ii,:))) - rho_ij(ii-1,:))-0.5.*(sign(v_avg(ii,:))).*(ones(size(rho_ij(ii,:)))-2.*rho_ij(ii,:)-rho_ij(ii-1,:)); % assumes density to be zero at far-field
+            del_rho_dr(ii,:) = 0.5*(ones(size(rho_ij(ii,:))) - rho_ij(ii-1,:))-0.5.*(sign(v_avg(ii,:))).*(ones(size(rho_ij(ii,:)))-2.*rho_ij(ii,:)-rho_ij(ii-1,:)); % assumes density to be one at far-field
         else
             del_rho_dr(ii,:) = 0.5*(rho_ij(ii+1,:) - rho_ij(ii-1,:))-0.5.*(sign(v_avg(ii,:))).*(rho_ij(ii+1,:)-2.*rho_ij(ii,:)-rho_ij(ii-1,:));
         end
     end
-    
+        
     rho_ds = (u_avg./sqrt(q2_avg)).*del_rho_dT + (v_avg./sqrt(q2_avg)).*del_rho_dr;
 %     rho_ij = rho_ij;% - eps_ij.*rho_ds;
     
@@ -295,6 +304,7 @@ while res(end) > tol % iterate through time
     
 end
 
+toc
 %% Post Process
 
 % Calculate Velocity as function of PHI(n)

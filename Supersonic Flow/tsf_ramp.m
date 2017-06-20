@@ -7,9 +7,9 @@ close all;
 % Step Sizes
 dx = 0.05;
 dy = 0.08;
-dt = 0.005;
+dt = 0.01;
 
-alpha = 50;
+alpha = 200;
 
 % Airfoil Dimensions
 m_x = tand(25); % dy/dx
@@ -17,49 +17,28 @@ tau = 0.05;
 chord = 1.0;
 
 % Field Axis Values
-y_max = 7;
-x_max = 3 + 20*dx;
-x_min = -39*dx; %(-19*dx);
+y_max = 10;
+x_max = 2.5;%1 + 20*dx;
+x_min = (-19*dx);
 x_vals = x_min:dx:x_max;
 y_vals = 0:dy:y_max;
 [XX, YY] = meshgrid(x_vals, y_vals);
 
-% % Body Values - Parabolic
+% Body Values - Ramp
 YY_B = [zeros(size(x_vals(x_vals <0))), ...
-        2*tau.*x_vals((x_vals>=0)&(x_vals <=1)).*(1- x_vals((x_vals>=0)&(x_vals <=1))),...
-        zeros(size(x_vals(x_vals >1)))];
+        m_x.*x_vals((x_vals>=0)&(x_vals <= 1.0)),...
+        tau.*ones(size(x_vals(x_vals > 1.0)))];
+
 dyBdx = zeros(size(YY_B));
-
-for i = 2:(length(YY_B))
-   dyBdx(i) = (YY_B(i) - YY_B(i-1))/(dx);
+for i = 2:(length(YY_B)-1)
+   dyBdx(i) = (YY_B(i+1) - YY_B(i-1))/(2*dx);
 end
-
-% % Body Values - Wedge
-% YY_B = [zeros(size(x_vals(x_vals <0))), ...
-%         2*tau.*x_vals((x_vals>=0)&(x_vals <=0.5)),...
-%         2*tau.*(1- x_vals((x_vals>0.5)&(x_vals <=1))),...
-%         zeros(size(x_vals(x_vals >1)))];
-% dyBdx = zeros(size(YY_B));
-% 
-% for i = 2:(length(YY_B))
-%    dyBdx(i) = (YY_B(i) - YY_B(i-1))/(dx);
-% end
-
-% Body Values - Ellipse box
-% YY_B = [zeros(size(x_vals(x_vals <0))), ...
-%         0.25.*sqrt(1 - (x_vals((x_vals>=0)&(x_vals <= 1.0))-1).^2),...
-%         0.25.*ones(size(x_vals(x_vals > 1.0)))];
-% 
-% dyBdx = zeros(size(YY_B));
-% for i = 2:(length(YY_B)-1)
-%    dyBdx(i) = (YY_B(i) - YY_B(i-1))/(dx);
-% end
 
 % Fluid Params
 gam = 1.4; % heat 
 M0 = 1.401;
 visc_on = 0;
-v_coeff = 1;
+v_coeff = 1.2;
 
 %% SIM CONTROL VARIABLE INITIALIZATION
 
@@ -183,14 +162,14 @@ while (res(end) > tol)|| (iter < 100) % iterate through time
 
                 PHI_XX = (RHO_i1.*(PHI_old(:,i+1,2) - PHI_old(:,i,2))./dx - RHO_i_1.*(PHI_old(:,i,2) - PHI_old(:,i-1,2))./dx)./dx;
             
-%                 PHI_YY = sys_yy*PHI_old(:,i,2) - (1/dy).*[dyBdx(i); zeros(length(y_vals)-1, 1)];
-                PHI_YY = [((PHI_old(2:end,i,2) - PHI_old(1:end-1,i,2))./dy - [dyBdx(i); (PHI_old(2:end-1,i,2) - PHI_old(1:end-2,i,2))./dy])./dy; 0];
+                PHI_YY = sys_yy*PHI_old(:,i,2) - (1/dy).*[dyBdx(i); zeros(length(y_vals)-1, 1)];
 
                 PHI_new(:,i) = (PHI_XX + PHI_YY + 2/(dt^2)*PHI_old(:,i,2) - (1/dt^2 - 0.5*alpha/dt)*PHI_old(:,i,1))/(1/dt^2 + 0.5*alpha/dt);
             end
         end
         
         PHI_new(end,:) = BC.PHI_II;
+
     end
     
     % Run Residual Check
@@ -211,11 +190,10 @@ end
 % xmin = -2;
 % xmax = 4;
 % Calculate Density from previous sweep through field (lagging?)
-PHI_old(:,:,2) = PHI_new;
 U_n = ones(size(XX)); % PHI_X... only need velocity in X-dir
 
 for i = 2:(size(XX, 2)-1) % loop through x-vals
-    U_n(:,i) = (PHI_old(:,i+1,2) - PHI_old(:,i-1,2))./(2.*dx);
+    U_n(:,i) = (PHI_old(:,i+1) - PHI_old(:,i-1))./(2.*dx);
     % determine velocity at the far-field end?
 end
 U_n(:,1) = BC.Vx_I;
@@ -233,8 +211,8 @@ M_ij = U_n./sqrt(a2_avg);
 
 folderName = ['M_' num2str(M0)];
 
-if ~exist([pwd '\airfoil\' folderName], 'dir')
-    mkdir([pwd '\airfoil\' folderName]);
+if ~exist([pwd '\ramp\' folderName], 'dir')
+    mkdir([pwd '\ramp\' folderName]);
 end
 
 close all;
@@ -243,24 +221,24 @@ title('Residual Plot');
 xlabel('# of iterations');
 ylabel('Residual (Error)');
 
-saveas(gcf, [pwd '\airfoil\' folderName '\residual_plot.png']);
-saveas(gcf, [pwd '\airfoil\' folderName '\residual_plot']);
+saveas(gcf, [pwd '\ramp\' folderName '\residual_plot.png']);
+saveas(gcf, [pwd '\ramp\' folderName '\residual_plot']);
 
 % plot density
 figure();contourf(XX,YY,rho_ij, 50)
 title('Density (Normalized)');
 colorbar('eastoutside');
 axis equal
-saveas(gcf, [pwd '\airfoil\' folderName '\density.png']);
-saveas(gcf, [pwd '\airfoil\' folderName '\density']);
+saveas(gcf, [pwd '\ramp\' folderName '\density.png']);
+saveas(gcf, [pwd '\ramp\' folderName '\density']);
 
 figure(); % cp plots
 contourf(XX, YY, 1-(U_n.^2), 50); %./((RR.*cos(TT)).^2)
 title('Pressure Coefficient Contours');
 colorbar('eastoutside');
 axis equal
-saveas(gcf, [pwd '\airfoil\' folderName '\cp_contour.png']);
-saveas(gcf, [pwd '\airfoil\' folderName '\cp_contour']);
+saveas(gcf, [pwd '\ramp\' folderName '\cp_contour.png']);
+saveas(gcf, [pwd '\ramp\' folderName '\cp_contour']);
 
 % Surface CP
 figure();
@@ -268,35 +246,35 @@ plot(XX(1,:), 1 - U_n(1,:).^2);
 xlabel('X');
 %     ylabel('\phi_{\theta}');
 ylabel('C_p');
-title('C_p on surface of airfoil');
+title('C_p on surface of ramp');
 set(gca, 'Ydir', 'reverse');
 % axis equal
-saveas(gcf, [pwd '\airfoil\' folderName '\cp_surf.png']);
-saveas(gcf, [pwd '\airfoil\' folderName '\cp_surf']);
+saveas(gcf, [pwd '\ramp\' folderName '\cp_surf.png']);
+saveas(gcf, [pwd '\ramp\' folderName '\cp_surf']);
 
 figure(); % field potential
 contourf(XX, YY, PHI_new, 50);
 title('Field Potential, \Phi');
 colorbar('eastoutside');
 axis equal
-saveas(gcf, [pwd '\airfoil\' folderName '\phi_pot.png']);
-saveas(gcf, [pwd '\airfoil\' folderName '\phi_pot']);
+saveas(gcf, [pwd '\ramp\' folderName '\phi_pot.png']);
+saveas(gcf, [pwd '\ramp\' folderName '\phi_pot']);
 
 figure(); % theta-dir velocity plots
 contourf(XX, YY, U_n, 50); %./((RR.*cos(TT)).^2)
 title('\Phi_X velocity');
 colorbar('eastoutside');
 axis equal
-saveas(gcf, [pwd '\airfoil\' folderName '\phi_theta.png']);
-saveas(gcf, [pwd '\airfoil\' folderName '\phi_theta']);
+saveas(gcf, [pwd '\ramp\' folderName '\phi_theta.png']);
+saveas(gcf, [pwd '\ramp\' folderName '\phi_theta']);
 
 figure();
 contourf(XX, YY, M_ij, 50);
 title('Mach Number');
 colorbar('eastoutside');
 axis equal
-saveas(gcf, [pwd '\airfoil\' folderName '\mach.png']);
-saveas(gcf, [pwd '\airfoil\' folderName '\mach']);
+saveas(gcf, [pwd '\ramp\' folderName '\mach.png']);
+saveas(gcf, [pwd '\ramp\' folderName '\mach']);
 
 %% Save Results
-save([pwd '\airfoil\' folderName '\results.mat']);
+save([pwd '\ramp\' folderName '\results.mat']);
