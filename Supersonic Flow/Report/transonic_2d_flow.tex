@@ -1,0 +1,121 @@
+\documentclass[hidelinks, 12pt]{article}
+
+%\usepackage{revtex4-1}
+\usepackage{soul}
+\usepackage{color}
+\usepackage{outlines}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{supertabular}
+\usepackage{amsmath}
+\usepackage[margin=1in]{geometry}
+\usepackage{fancyhdr}
+\usepackage{setspace}
+\usepackage{amsthm}
+\usepackage{amssymb}
+\usepackage{indentfirst}
+\usepackage{caption}
+\pagestyle{headings}
+\usepackage{setspace}
+\usepackage[utf8]{inputenc}
+%\usepackage[english]{babel}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{gensymb}
+\usepackage{url}
+\usepackage{siunitx}
+\usepackage{subcaption}
+\usepackage{float}
+%\usepackage{circuitikz}
+\usepackage{parskip}
+\usepackage{wrapfig, lipsum, booktabs}
+\usepackage{boldline}
+\usepackage{pdfpages}
+\usepackage{rotating}
+\usepackage{tikz}
+\usepackage[toc,page]{appendix}
+\usepackage{hyperref}
+\usepackage{cases}
+\usepackage{nomencl}
+\usepackage{subcaption}
+\makenomenclature
+\makeindex
+%\usepackage{ifpdf}
+%\usepackage{mla}
+%
+%\usepackage[american]{babel} 
+%\usepackage{csquotes} 
+%\usepackage[style=mla-new, backend=biber]{biblatex}
+%\addbibresource{book.bib}
+
+%\def\changemargin#1#2{\list{}{\rightmargin#2\leftmargin#1}\item[]}
+%\let\endchangemargin=\endlist 
+
+
+\begin{document}
+	
+\title{Numerical Solutions for 2D Transonic Flow Around Various Geometries}
+\author{Andrew Chuen\\999099339}
+\date{\today}
+\maketitle
+
+\newpage
+
+\section{Introduction}
+
+\section{Governing Equations and Boundary Conditions}
+
+Three sets of governing equations are presented to solve for transonic flow. Each of the governing equations are solved using the same iterative schemes, which are discussed in section \ref{schemes}. 
+
+\subsection{Full, Compressible, Potential Flow (1 Eqn.)}
+% assumptions: compressible, irrotational, inviscid, adiabatic
+Potential flow is a well-known solution that can be obtained from simplifications of the Euler equations. The formulations can be arrived from assuming the fluid is irrotational and incompressible. Recall that, if the curl of the velocity is assumed to be zero, there must exist a potential field such that its vector gradient is the velocity vector.
+
+\begin{align}
+\nabla \times \vec{u} = \nabla \times \left(\nabla \Phi\right) &= 0 \\
+\Rightarrow \nabla \Phi &= \vec{u}
+\end{align}
+
+The compressible form can be realized by substituting $\Phi$ into the steady, mass divergence term of the continuity equation.
+
+\begin{align}
+\nabla \cdot \left(\rho \vec{u}\right) &= 0 \\
+\Rightarrow \nabla \cdot \left(\rho \nabla \Phi\right) &= 0
+\end{align}
+
+The two-dimensional formulation gives the resulting governing equation.
+
+\begin{equation}
+\left(\rho \Phi_x\right)_x + \left(\rho \Phi_y\right)_y = 0
+\end{equation}
+
+A density formulation is necessary to close the system of equations. The density can be obtained from the velocity, which is given by the isentropic Bernoulli's equations. 
+
+\begin{equation}
+\rho = \left[1 - \dfrac{\gamma - 1}{2}M_{\infty}^2\left(u^2 + v^2 - 1\right)\right]^{\frac{1}{\gamma - 1}}
+\end{equation}
+
+\subsection{Full Potential with Momentum Equation (2 Eqn.)}
+% assumptions: compressible, irrotational, inviscid, adiabatic
+The integrated momentum equation can also be introduced into the 
+
+\subsection{Euler-Isentropic Equations (3 Eqns.)}
+% assumptions: compressible, inviscid, isentropic
+% want to solve the euler equations directly
+% want to solve 
+
+\section{Numerical Methods and Schemes}\label{schemes}
+
+\subsection{Three-Level Scheme}
+
+\subsection{Artificial Viscous Dissipation}
+
+\section{Numerical Results}
+
+
+\section{Concluding Remarks}
+
+
+%% References
+	
+\end{document}

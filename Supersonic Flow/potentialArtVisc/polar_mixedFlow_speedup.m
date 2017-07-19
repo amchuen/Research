@@ -6,7 +6,7 @@ close all;
 
 % Fluid Params
 gam = 1.4; % heat 
-M0 = 0.53;
+M0 = 0.3;
 v_coeff = 1.5;
 
 % Step Sizes

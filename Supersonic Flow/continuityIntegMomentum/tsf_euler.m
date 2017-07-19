@@ -84,16 +84,6 @@ while (res(end) > CT.tol)|| (length(res) < 100) % iterate through time
 			BC.Vr_II]; % PHI_Y, central difference
         
     q2_ij = (phiT ./ GR.RR).^2 + phiR.^2;
-%     a2_ij = (1./FL.M0.^2)-0.5*(FL.gam-1).*(q2_ij - 1);
-% 	eps_ij = max(zeros(size(a2_ij)), 1 - 0.99.*(a2_ij./q2_ij));
-
-%     if any(eps_ij(:) ~= 0) && (visc_on ==0) % viscosity not being used and then turned on
-%         visc_on = 1;
-%         fprintf('Viscosity model activated! Iteration: %i\n', length(res)+1);        
-%     elseif (visc_on == 1) && (all(eps_ij(:) == 0))
-%         visc_on = 0;
-%         fprintf('Viscosity model turned off! Iteration: %i\n', length(res)+1);
-%     end
     
     for i = 1:(size(PHI,2)) % march along theta direction
         % Density Calculation
@@ -140,11 +130,11 @@ while (res(end) > CT.tol)|| (length(res) < 100) % iterate through time
     res(end+1)= max(max(diff_phi(:)), max(diff_rho(:)));
 
     % READOUT
-    if (length(res) > 500) && (mod(length(res), 500) == 0)
+%     if (length(res) > 500) && (mod(length(res), 500) == 0)
         fprintf('Iteration Ct: %i\n', length(res));
         fprintf('Current Residual: %0.5e\n', res(end));
-        figure(1);semilogy(1:length(res), res);
-    end
+%         figure(1);semilogy(1:length(res), res);
+%     end
 
 end
 

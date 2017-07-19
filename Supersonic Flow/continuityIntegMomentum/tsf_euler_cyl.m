@@ -5,7 +5,7 @@ clear;
 %% GR - grid information, such as the meshfield, grid spacing (dx, dy, etc.)
 % Define Grid
 GR.dr = 0.05;
-GR.dT = 0.08*pi;
+GR.dT = 0.01*pi;
 
 % Field Axis Values
 r_cyl = 1.0;
