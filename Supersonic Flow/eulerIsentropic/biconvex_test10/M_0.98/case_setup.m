@@ -14,15 +14,15 @@ case_name = 'biconvex_test';
 
 %% FL - fluid parameters
 gam = 1.4; % heat 
-M0 = 1.4;
+M0 = 0.98;
 
 %% GR - grid information, such as the meshfield, grid spacing (dx, dy, etc.)
 % Define Grid
-dx = 0.05;
-dy = 0.08;
+dx = 0.01;
+dy = 0.08/5;
 
 % Field Axis Values - body fitted grid
-x_range=[   -39*dx,...
+x_range=[   -7-39*dx,...
             7 + 20*dx];
 y_range=[   0,...
             10];
@@ -83,9 +83,12 @@ tic;
 while (max(res(end, :)) > tol*max(res(:)))|| (size(res,1) < iter_min) % iterate through time
     
     % Update Field Values
-    RHO.fv(:,:,1:2) = RHO.fv(:,:,2:3);
-    AA.fv(:,:,1:2) = AA.fv(:,:,2:3);
-    BB.fv(:,:,1:2) = BB.fv(:,:,2:3);
+    RHO.fv(:,:,1) = RHO.fv(:,:,2);
+    RHO.fv(:,:,2) = RHO.fv(:,:,3);
+    AA.fv(:,:,1) = AA.fv(:,:,2);
+    AA.fv(:,:,2) = AA.fv(:,:,3);
+    BB.fv(:,:,1) = BB.fv(:,:,2);
+    BB.fv(:,:,2) = BB.fv(:,:,3);
     PP.fv = RHO.fv(:,:,2).^(gam) ./ (gam .* M0.^2); % pressure
     
     % Update Boundary Conditions
@@ -115,13 +118,13 @@ while (max(res(end, :)) > tol*max(res(:)))|| (size(res,1) < iter_min) % iterate 
     % Calculate new RHO
     [Ax, ~, ~] = grad_f(AA.fv(:,:,2), 2, dx, AA.BC, 1);
     [By, ~, ~] = grad_f(BB.fv(:,:,2), 1, dy, BB.BC, 1);
-	laplace_RHO = laplace_f(RHO, dx, dy, RHO.BC, 0);
+	laplace_RHO = laplace_f(RHO.fv(:,:,2), dx, dy, RHO.BC, 1);
     RHO.fv(:,:,3) = (eps_s.*laplace_RHO - Ax - By - (eps_t./(dt^2) - 0.5./dt).*RHO.fv(:,:,1) + 2.*eps_t.*RHO.fv(:,:,2)./(dt.^2))./(eps_t./(dt^2) + 0.5./dt);
         
     % Calculate new A
     [A2_rho_x, ~, ~] = grad_f((AA.fv(:,:,2).^2)./RHO.fv(:,:,2), 2, dx, AA.BC, 1);
     [AB_rho_y, ~, ~] = grad_f((AA.fv(:,:,2).*BB.fv(:,:,2))./RHO.fv(:,:,2), 1, dy, AB_R.BC, 1);
-    laplace_A = laplace_f(AA, dx, dy, AA.BC, 0);
+    laplace_A = laplace_f(AA.fv(:,:,2), dx, dy, AA.BC, 1);
     [P_x, ~, ~] = grad_f(PP.fv, 2, dx, PP.BC, 1);
     AA.fv(:,:,3) = (eps_s.*laplace_A - P_x - A2_rho_x - AB_rho_y - (eps_t./(dt^2) - 0.5./dt).*AA.fv(:,:,1) + 2.*eps_t.*AA.fv(:,:,2)./(dt.^2))./(eps_t./(dt^2) + 0.5./dt);
     
@@ -156,7 +159,10 @@ while (max(res(end, :)) > tol*max(res(:)))|| (size(res,1) < iter_min) % iterate 
         fprintf('Iteration Ct: %i\n', size(res, 1));
         fprintf('Current Residual: %0.5e\n', max(res(end, :)));
         toc;
-        figure(1);semilogy(1:size(res,1), res(:,1), 1:size(res,1), res(:,2), 1:size(res,1), res(:,3));
+        figure(1);semilogy(1:size(res,1), res(:,1));
+        hold on;
+        semilogy(1:size(res,1), res(:,2));
+        semilogy(1:size(res,1), res(:,3));
         hold off;
         legend('Density', '\rho u', '\rho v');
         fprintf('\n');
@@ -276,5 +282,5 @@ saveas(gcf, [pwd '\' geomName '\' folderName '\phi_radius']);
 save([pwd '\' geomName '\' folderName '\results.mat']);
 
 %% Save copy of file
-% fprintf('%s\n', mfilename);
+disp(mfilename);
 copyfile('biconvex.m',[pwd '\' geomName '\' folderName '\case_setup.m']);

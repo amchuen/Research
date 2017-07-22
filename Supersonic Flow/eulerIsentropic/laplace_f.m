@@ -1,4 +1,4 @@
-function laplacian = laplace_f(FF, dx, dy, BC, enforce)
+function laplacian = laplace_f(FF, dx, dy, BC, varargin)
 
 %% laplace_f -> takes the laplacian of the given field variable FF
 
@@ -22,14 +22,35 @@ function laplacian = laplace_f(FF, dx, dy, BC, enforce)
 
 
 %% Solution
+enforce = 1;
 
-% Get F_xx
-[~, fx_f, fx_b]= grad_f(FF, 2, dx, BC, enforce);
-F_xx = (fx_f - fx_b)./dx;
- 
-% Get F_yy
-[~, fy_f, fy_b]= grad_f(FF, 1, dy, BC, enforce);
-F_yy = (fy_f - fy_b)./dy;
+if all(size(varargin{1}) == size(FF))
+    % if true, then input must be additional info for polar calculations
+    RR = varargin{1};
+    is_polar = 1;
+else
+    is_polar = 0;
+end
+
+if is_polar
+    % Get F_xx (theta direction)
+    [~, fx_f, fx_b]= grad_f(FF, 2, dx, BC, enforce);
+    F_xx = ((fx_f - fx_b)./dx)./(RR.^2);
+
+    % Get F_yy (radial direction)
+    rr_n = [0.5.*(RR(2:end,:) + RR(1:(end-1),:)); 0.5.*((RR(end,:)+dy) + RR(end,:))];
+    rr_s = 0.5.*([2.*RR(1,:); RR(2:end,:) + RR(1:(end-1),:)]);
+    [~, fy_f, fy_b]= grad_f(FF, 1, dy, BC, enforce);
+    F_yy = ((rr_n.*fy_f - rr_s.*fy_b)./dy)./(RR);
+else
+    % Get F_xx
+    [~, fx_f, fx_b]= grad_f(FF, 2, dx, BC, enforce);
+    F_xx = (fx_f - fx_b)./dx;
+
+    % Get F_yy
+    [~, fy_f, fy_b]= grad_f(FF, 1, dy, BC, enforce);
+    F_yy = (fy_f - fy_b)./dy;
+end
  
 % Get Full Laplacian
 laplacian = F_xx + F_yy;

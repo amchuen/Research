@@ -1,4 +1,4 @@
-function BC = init_fv(BC_type, BC_val, XX)
+function [BC, BC2] = init_fv(BC_type, BC_val, XX)
 
 %% Solution
 
@@ -13,6 +13,7 @@ fnames_N = {'Wx', 'Ex', 'Ny', 'Sy'};
 % * S -> symmetry, Neumann
 
 BC = struct();
+BC2 = BC;
 
 for i = 1:length(fnames_D)
     [r_check, c_check] = size(BC_val{i});
@@ -31,8 +32,10 @@ for i = 1:length(fnames_D)
     % Check for dirichlet or Neumann
     if strcmp(BC_type{i}, 'D') % Dirichlet condition occurs
         BC.(fnames_D{i}) = tempBC;
+        BC2.(fnames_D{i}) = tempBC.^2;
     elseif strcmp(BC_type{i}, 'N') % Neumann condition occurs
         BC.(fnames_N{i}) = tempBC;
+        BC2.(fnames_N{i}) = tempBC;
     end
     
 end

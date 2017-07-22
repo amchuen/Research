@@ -1,6 +1,6 @@
 classdef fieldVar
    properties
-       
+       GR % grid
    end
    
    methods
