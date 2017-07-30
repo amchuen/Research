@@ -2,83 +2,95 @@ clc;
 close all;
 clear;
 
-%% GR - grid information, such as the meshfield, grid spacing (dr, dT, etc.)
-
-case_name = 'cylinder';
-
-% Define Grid
-dT = 0.01*pi;
-dr = 0.05;
-
-% Field Axis Values
-r_max = 25;
-r_cyl = 0.5; 
-x_max = 30; %10 + 20*dr;
-x_min = 0.0; %-39*dr; %(-19*dr);
-T_vals = 0.0:dT:pi;%x_min:dT:x_max;
-R_vals = r_cyl:dr:r_max;
-[TT, RR] = meshgrid(T_vals, R_vals);
-XX = RR .* cos(TT);
-YY = RR .* sin(TT);
-
-%% FL - fluid parameters
-gam = 1.4; % heat 
-M0 = 0.25;
-
 %% CT - simulation control, including tolerances, viscous factor gain, etc.
-eps_s = 0.000075; % spatial diffusion term
-eps_t = 0.000075; % time diffusion term
+eps_s = 0.005; % spatial diffusion term
+eps_t = 0.0013; % time diffusion term
 tol = 1e-3;
 dt = 0.01^2;
 iter_min = 300;
 CFL_on = 1;
 
+case_name = 'cylinder';
+
+%% FL - fluid parameters
+gam = 1.4; % heat 
+M0 = 0.35;
+
+%% GR - grid information, such as the meshfield, grid spacing (dr, dT, etc.)
+
+% Define Grid
+dT = 0.01*pi;
+dr = 0.01;
+
+r_cyl = 0.5;
+
+% Field Axis Values - body fitted grid
+R_range=[   r_cyl+0.5*dr,... % r_cyl
+            15];
+T_range=[   0,...
+            pi];
+
 %% INITIALIZE
 
-% Three level scheme
-RHO.fv = ones([size(TT), 3]); % density
-AA.fv = repmat(-(1 + (r_cyl^2)./(RR.^2)).*sin(TT), 1, 1, 3); % rho * u (theta)
-BB.fv = repmat(cos(TT).*(1 - (r_cyl^2)./((RR).^2)),1,1,3); % rho * v (radial vel)
-PP.fv = RHO.fv(:,:,2).^(gam) ./ (gam .* M0.^2); % pressure
-
-%% BodT Values - Cylinder
-tau = 2;%0.1;
-m_x = tand(8); % dT/dr
-YY_B = [zeros(size(T_vals(T_vals <6))), ...
-        tau.*ones(size(T_vals(T_vals >= 6)))];
-dTBdr = zeros(size(YY_B));
-
+GR = struct('R_vals',[], 'T_vals',[], 'RR',[], 'TT',[]);
+RHO = struct('fv',[],'BC',[], 'GR', []);
+AA = RHO; % radial velocity
+BB = RHO; % angular velocity
+AB_R = RHO;
+PP = RHO;
+for i = 1:size(T_range,1)
+    GR(i).r_vals = R_range(i,1):dr:R_range(i,2);
+    GR(i).T_vals = T_range(i,1):dT:T_range(i,2);
+    [GR(i).TT, GR(i).RR] = meshgrid(GR(i).T_vals, GR(i).r_vals);
+    GR(i).XX = GR(i).RR .* cos(GR(i).TT);
+    GR(i).YY = GR(i).RR .* sin(GR(i).TT);
+        
+    RHO(i).fv = ones([size(GR(i).TT), 3]); % density
+    AA(i).fv = repmat(cos(GR(i).TT).*(1 - (r_cyl^2)./(GR(i).RR.^2)), 1, 1, 3);
+    BB(i).fv = repmat(-(1 + (r_cyl^2)./(GR(i).RR.^2)).*sin(GR(i).TT), 1, 1, 3); % rho * v
+%     AA(i).fv = RHO(i).fv;
+%     BB(i).fv = RHO(i).fv;
+    AB_R(i).fv = AA(i).fv .* BB(i).fv ./ RHO(i).fv;
+    PP(i).fv = RHO(i).fv(:,:,2).^(gam) ./ (gam .* M0.^2); % pressure
+end
 
 %% Boundary Conditions
 
-% Inlet - West (Symmetry)
-RHO.BC.Wx = zeros(size(TT(:,end))); % neumann condition
-AA.BC.Wx = RHO.BC.Wx; % neumann condition
-BB.BC.Wx = RHO.BC.Wx; % neumann condition
-AB_R.BC.Wx = RHO.BC.Wx; % Neumann condition
-PP.BC.Wx = RHO.BC.Wx; % Neumann condition
+BC_rho = {'N', 'N', 'D', 'N'}; % west symmetry, east symmetry, far-field, symmetry/wall
+% BC_BB = {'N', 'N', 'D', 'N'}; % angular velocity
+BC_BB = {'D', 'D', 'D', 'N'}; % angular velocity
+BC_AA = {'N', 'N', 'D', 'D'}; % radial velocity
+BC_AB_R = {'N', 'N', 'D', 'D'}; % vorticity defined dynamically?
 
-% Outlet - East (Symmetry)
-RHO.BC.Ex = zeros(size(TT(:,end))); % neumann condition
-AA.BC.Ex = RHO.BC.Ex; % neumann condition
-BB.BC.Ex = RHO.BC.Ex; % neumann condition
-AB_R.BC.Ex = RHO.BC.Ex; % Neumann condition
-PP.BC.Ex = RHO.BC.Ex; % Neumann condition
-%(RHO.fv(:,end,2).^(gam))./(gam .* M0.^2); % dirichlet BC, update with time
+% Continuity
+BCval_R = {0, 0, 1, 0};
+[RHO.BC, ~] = init_fv(BC_rho, BCval_R, GR.XX);
 
-% Far-field - North
-RHO.BC.N = ones(size(TT(end,:))); % dirichlet BC
-BB.BC.N = -(1 + (r_cyl^2)./((RR(end,:)).^2)).*sin(TT(end,:)); % dirichlet BC
-AA.BC.N = cos(TT(end,:)).*(1 - (r_cyl^2)./((RR(end,:)).^2)); % dirichlet BC
-PP.BC.N = (RHO.BC.N.^(gam))./(gam .* M0.^2); % dirichlet BC
-AB_R.BC.N = AA.BC.N .* BB.BC.N ./ RHO.BC.N; % dirichlet BC
+BCval_rA = {0, 0, (cos(GR.TT(end,:)).*(1 - (r_cyl^2)./((GR.RR(end,:)+dr).^2))).*(GR.RR(end,:)+dr), 0};
+[rA.BC, ~] = init_fv(BC_AA, BCval_rA, GR.XX);
 
-% Wall/Symmetry - South
-RHO.BC.Sy = zeros(size(TT(1,:))); % neumann condition
-BB.BC.Sy = zeros(size(TT(1,:))); % neumann condition
-AA.BC.S = RHO.fv(1,:,2).*dTBdr; % dirichlet condition... update with time
-PP.BC.Sy = zeros(size(TT(1,:))); % neumann condition
-AB_R.BC.S = BB.BC.S .* AA.fv(1,:,2) ./ RHO.fv(1,:,2); % dirichlet condition... update with time
+BCval_BB = {-BB.fv(:,2,2), -BB.fv(:,end-1,2),  -(1 + (r_cyl^2)./((GR.RR(end,:)+dr).^2)).*sin(GR.TT(end,:)), 0};
+[BB.BC, B2.BC] = init_fv(BC_BB, BCval_BB, GR.XX);
+
+% Radial momentum
+BCval_rA2_R = {0, 0, ((cos(GR.TT(end,:)).*(1 - (r_cyl^2)./((GR.RR(end,:)+dr).^2))).^2).*(GR.RR(end,:)+dr), 0};
+[rA2_R.BC, ~] = init_fv(BC_AA, BCval_rA2_R, GR.XX);
+
+BCval_AB_R = {0, 0, BCval_BB{3} .* (cos(GR.TT(end,:)).*(1 - (r_cyl^2)./((GR.RR(end,:)+dr).^2))), 0};
+[AB_R.BC, ~] = init_fv(BC_AB_R, BCval_AB_R, GR.XX); % vorticity term in Radial Momentum
+
+BCval_VV = {0, 0, BCval_BB{3}, 0};
+[VV.BC, ~] = init_fv(BC_BB, BCval_VV, GR.XX);
+
+BCval_AA = {0, 0, cos(GR.TT(end,:)).*(1 - (r_cyl^2)./((GR.RR(end,:)+dr).^2)), 0};
+[AA.BC, ~] = init_fv(BC_AA, BCval_AA, GR.XX);
+
+% Tangential Momentum
+BCval_rAB_R = {0, 0, BCval_AB_R{3} .* (GR.RR(end,:)+dr), 0};
+[rAB_R.BC, ~] = init_fv(BC_AB_R, BCval_rAB_R, GR.XX); % vorticity term in Angular Momentum
+
+val_test = [0, 0, 1, 0]; 
+[PP.BC, ~] = init_fv(BC_rho, num2cell((val_test.^(gam))./(gam .* M0.^2)), GR.XX);
 
 %% START SOLUTION
 
@@ -86,75 +98,82 @@ res = [1, 1, 1];
 tic;
 while (max(res(end, :)) > tol*max(res(:)))|| (size(res,1) < iter_min) % iterate through time
     
-    % Update Field Values
-    RHO.fv(:,:,1) = RHO.fv(:,:,2);
-    RHO.fv(:,:,2) = RHO.fv(:,:,3);
-    AA.fv(:,:,1) = AA.fv(:,:,2);
-    AA.fv(:,:,2) = AA.fv(:,:,3);
-    BB.fv(:,:,1) = BB.fv(:,:,2);
-    BB.fv(:,:,2) = BB.fv(:,:,3);
+   % Update Field Values
+    RHO.fv(:,:,1:2) = RHO.fv(:,:,2:3);
+    AA.fv(:,:,1:2) = AA.fv(:,:,2:3);
+    BB.fv(:,:,1:2) = BB.fv(:,:,2:3);
     PP.fv = RHO.fv(:,:,2).^(gam) ./ (gam .* M0.^2); % pressure
     
     % Update Boundary Conditions
-%     BB.BC.S = RHO.fv(1,:,2).*dTBdr; % dirichlet condition... update with time
-    AB_R.S = BB.BC.S .* AA.fv(1,:,2) ./ RHO.fv(1,:,2); % dirichlet condition... update with time
+    BCval_BB = {-BB.fv(:,2,2), -BB.fv(:,end-1,2),  -(1 + (r_cyl^2)./((GR.RR(end,:)+dr).^2)).*sin(GR.TT(end,:)), 0}; % update along axis of symmetry
+    [BB.BC, B2.BC] = init_fv(BC_BB, BCval_BB, GR.XX);
     
+    BCval_VV = {BCval_BB{1}./RHO.fv(:,2,2), BCval_BB{2}./RHO.fv(:,end-1,2), BCval_BB{3}, 0}; % update along axis of symmetry
+    [VV.BC, ~] = init_fv(BC_BB, BCval_VV, GR.XX);
+
     % Check CFL conditions
-    Ux = (AA.fv(:,:,2)./RHO.fv(:,:,2));
-    Vy = (BB.fv(:,:,2)./RHO.fv(:,:,2));
-    CFL_i = (max(abs(Ux(:)))./dT + max(abs(Vy(:)))./dr)*dt;
+    Ur = (AA.fv(:,:,2)./RHO.fv(:,:,2));
+    VT = (BB.fv(:,:,2)./RHO.fv(:,:,2))./GR.RR;
+    CFL_i = (max(abs(Ur(:)))./(dr) + max(abs(VT(:)))./dT)*dt;
 
     if CFL_i >= 1.0 && CFL_on
        fprintf('CFL condition not met!\n');
-%            if CFL_on
        fprintf('Decreasing time steps!\n');
        dt = dt*0.8 / CFL_i;
        fprintf('New time step:%0.5f\n', dt);
-%            end
-%     elseif CFL_i < 0.8
-%         dt = dt / CFL_i;
     end
     
-    % Calculate Derivatives
-    [Ar, ~, ~] = grad_f(RR.*AA.fv(:,:,2), 1, dr, AA.BC, 1);
-    [BT, ~, ~] = grad_f(BB.fv(:,:,2), 2, RR.*dT, BB.BC, 1);
-    [AT, ~, ~] = grad_f(AA.fv(:,:,2), 2, RR.*dT, AA.BC, 1);
-    [RHOT, ~, ~] = grad_f(RHO.fv(:,:,2), 2, RR.*dT, RHO.BC, 1);
-    [Br, ~, ~] = grad_f(BB.fv(:,:,2), 1, dr, BB.BC, 1);
-    [RHOr, ~, ~] = grad_f(RHO.fv(:,:,2), 1, dr, RHO.BC, 1);
-    
     % Calculate new RHO
-	laplace_RHO = laplace_f(RHO.fv(:,:,2), dr, dT, RHO.BC, 1); % note -> need to figure out how to modify radial term for polar coordinates
-	
-    RHO.fv(:,:,3) = (eps_s.*laplace_RHO - Ar./RR - BT - (eps_t./(dt^2) - 0.5./dt).*RHO.fv(:,:,1) + 2.*eps_t.*RHO.fv(:,:,2)./(dt.^2))./(eps_t./(dt^2) + 0.5./dt);
-    % Enforce BC's
-    RHO.fv(:,1,3) = RHO.BC.W;
-    RHO.fv(end,:,3) = RHO.BC.N;    
+%     [A_r, ~, ~] = grad_f(GR.RR.*AA.fv(:,:,2), 1, dr, AA.BC, 1); % this might be the error
+    [A_r, A_rf, A_rb] = grad_f(GR.RR.*AA.fv(:,:,2), 1, dr, rA.BC, 1); 
+    [B_T, B_Tf, B_Tb] = grad_f(BB.fv(:,:,2), 2, dT, BB.BC, 1);
+	laplace_RHO = laplace_f(RHO.fv(:,:,2), dT, dr, RHO.BC, GR.RR); % note -> need to figure out how to modify radial term for polar coordinates
+    RHO.fv(:,:,3) = (eps_s.*laplace_RHO - A_r./GR.RR - B_T./GR.RR - (eps_t./(dt^2) - 0.5./dt).*RHO.fv(:,:,1) + 2.*eps_t.*RHO.fv(:,:,2)./(dt.^2))./(eps_t./(dt^2) + 0.5./dt);
+    
+    if (~isreal(RHO.fv(:,:,end)) || any(any(isnan(RHO.fv(:,:,end))))) || any(any(RHO.fv(:,:,end)<0))
+        fprintf('Density exhibits non-solutions (either non-real or NaN) in nodes!\n');
+        break;
+    end
     
     % Calculate new A
-%     [A2_rho_x, ~, ~] = grad_f((AA.fv(:,:,2).^2)./RHO.fv(:,:,2), 2, dr, AA.BC, 1);
-%     [AB_rho_y, ~, ~] = grad_f((AA.fv(:,:,2).*BB.fv(:,:,2))./RHO.fv(:,:,2), 1, dT, AB_R.BC, 1);
-    A2_rho_x = 2.*AA.fv(:,:,2).*Ar./RHO.fv(:,:,2) - (AA.fv(:,:,2).^2 .* RHOr)./(RHO.fv(:,:,2).^2);
-    AB_rho_y = (AA.fv(:,:,2).*BT./RHO.fv(:,:,2)) + (BB.fv(:,:,2).*AT)./(RHO.fv(:,:,2)) - (AA.fv(:,:,2).*BB.fv(:,:,2).*RHOT)./(RHO.fv(:,:,2).^2);
-    laplace_A = laplace_f(AA.fv(:,:,2), dr, dT, AA.BC, 1);
-    [P_x, ~, ~] = grad_f(PP.fv, 2, dr, PP.BC, 1);
+    [rA2_rho_R, ~, ~] = grad_f((GR.RR .* AA.fv(:,:,2).^2)./RHO.fv(:,:,2), 1, dr, rA2_R.BC, 1);
+    [AB_rho_T, ~, ~] = grad_f((AA.fv(:,:,2).*BB.fv(:,:,2))./RHO.fv(:,:,2), 2, dT, AB_R.BC, 1);
+    [V_T, ~, ~] = grad_f(BB.fv(:,:,2)./RHO.fv(:,:,2), 2, dT, VV.BC, 1);
+    laplace_A = laplace_f(AA.fv(:,:,2)./RHO.fv(:,:,2), dT, dr, AA.BC, GR.RR)...
+                - (AA.fv(:,:,2)./RHO.fv(:,:,2))./(GR.RR.^2)...
+                -2*V_T./(GR.RR.^2);
+    [P_r, ~, ~] = grad_f(PP.fv, 1, dr, PP.BC, 1);
+    AA.fv(:,:,3) = (eps_s.*laplace_A - P_r + (BB.fv(:,:,2).^2)./(RHO.fv(:,:,2).*GR.RR) - rA2_rho_R./GR.RR - AB_rho_T./GR.RR - (eps_t./(dt^2) - 0.5./dt).*AA.fv(:,:,1) + 2.*eps_t.*AA.fv(:,:,2)./(dt.^2))./(eps_t./(dt^2) + 0.5./dt);
     
-    AA.fv(:,:,3) = (eps_s.*laplace_A - P_x - A2_rho_x - AB_rho_y - (eps_t./(dt^2) - 0.5./dt).*AA.fv(:,:,1) + 2.*eps_t.*AA.fv(:,:,2)./(dt.^2))./(eps_t./(dt^2) + 0.5./dt);
-    % Enforce BC's
-    AA.fv(:,1,3) = AA.BC.W;
-    AA.fv(end,:,3) = AA.BC.N;    
-    
+    if ~isreal(AA.fv(:,:,end)) || any(any(isnan(AA.fv(:,:,end))))
+        fprintf('Vr exhibits non-solutions (either non-real or NaN) in nodes!\n');
+        break;
+    end
+        
     % Calculate new B
-%     [AB_rho_x, ~, ~] = grad_f((AA.fv(:,:,2).*BB.fv(:,:,2))./RHO.fv(:,:,2), 2, dr, AB_R.BC, 1);
-%     [B2_rho_y, ~, ~] = grad_f((BB.fv(:,:,2).^2)./RHO.fv(:,:,2), 1, dT, BB.BC, 1);
-    B2_rho_y = 2.*BB.fv(:,:,2).*BT./RHO.fv(:,:,2) - (BB.fv(:,:,2).^2 .* RHOT)./(RHO.fv(:,:,2).^2);
-    AB_rho_x = (AA.fv(:,:,2).*Br./RHO.fv(:,:,2)) + (BB.fv(:,:,2).*Ar)./(RHO.fv(:,:,2)) - (AA.fv(:,:,2).*BB.fv(:,:,2).*RHOr)./(RHO.fv(:,:,2).^2);
-    laplace_B = laplace_f(BB.fv(:,:,2), dr, dT, BB.BC, 1);
-    [P_y, ~, ~] = grad_f(PP.fv, 1, dT, PP.BC, 1);
+    [rAB_rho_R, ~, ~] = grad_f((AA.fv(:,:,2).*BB.fv(:,:,2).*GR.RR)./RHO.fv(:,:,2), 1, dr, rAB_R.BC, 1);
+    [B2_rho_T, ~, ~] = grad_f((BB.fv(:,:,2).^2)./RHO.fv(:,:,2), 2, dT, B2.BC, 1);
+    [U_T, ~, ~] = grad_f(AA.fv(:,:,2)./RHO.fv(:,:,2), 2, dT, AA.BC, 1);
+    laplace_B = laplace_f(BB.fv(:,:,2)./RHO.fv(:,:,2), dT, dr, VV.BC, GR.RR)...
+                - (BB.fv(:,:,2)./RHO.fv(:,:,2))./(GR.RR.^2)...
+                +2*U_T./(GR.RR.^2);
+    [P_T, ~, ~] = grad_f(PP.fv, 2, dT, PP.BC, 1);
+    BB.fv(:,:,3) = (eps_s.*laplace_B - (BB.fv(:,:,2).*AA.fv(:,:,2))./(RHO.fv(:,:,2).*GR.RR) - P_T./GR.RR - rAB_rho_R./GR.RR - B2_rho_T./GR.RR - (eps_t./(dt^2) - 0.5./dt).*BB.fv(:,:,1) + 2.*eps_t.*BB.fv(:,:,2)./(dt.^2))./(eps_t./(dt^2) + 0.5./dt);
     
-    BB.fv(:,:,3) = (eps_s.*laplace_B - P_y - AB_rho_x - B2_rho_y - (eps_t./(dt^2) - 0.5./dt).*BB.fv(:,:,1) + 2.*eps_t.*BB.fv(:,:,2)./(dt.^2))./(eps_t./(dt^2) + 0.5./dt);
-    BB.fv(:,1,3) = BB.BC.W;
+    if any(any(max(abs(BB.fv(:,:,end)./RHO.fv(:,:,end)))>10))
+       fprintf('Check Tangential veocity!\n');
+    end
+    
+    if (~isreal(BB.fv(:,:,end)) || any(any(isnan(BB.fv(:,:,end)))))
+        fprintf('Vx exhibits non-solutions (either non-real or NaN) in nodes!\n');
+        break;
+    end
+        
+    % Enforce BC's
+    RHO.fv(end,:,3) = RHO.BC.N;
+    AA.fv(end,:,3) = AA.BC.N;  
     BB.fv(end,:,3) = BB.BC.N;
+    AA.fv(1,:,3) = AA.BC.S;
     
     % Calculate Residuals
     R_err = (abs(RHO.fv(:,:,3) - RHO.fv(:,:,2)));
@@ -180,32 +199,17 @@ while (max(res(end, :)) > tol*max(res(:)))|| (size(res,1) < iter_min) % iterate 
         fprintf('\n');
     end
     
-    if ~isreal(RHO.fv(:,:,end)) || any(any(isnan(RHO.fv(:,:,end))))
-        fprintf('Density exhibits non-solutions (either non-real or NaN) in nodes!\n');
-        break;
-    end
-    
-    if ~isreal(AA.fv(:,:,end)) || any(any(isnan(AA.fv(:,:,end))))
-        fprintf('Vx exhibits non-solutions (either non-real or NaN) in nodes!\n');
-        break;
-    end
-    
-    if ~isreal(BB.fv(:,:,end)) || any(any(isnan(BB.fv(:,:,end))))
-        fprintf('Vy exhibits non-solutions (either non-real or NaN) in nodes!\n');
-        break;
-    end
-    
 end
 
 %% Post Process
 
-Ux = (AA.fv(:,:,2)./RHO.fv(:,:,2));
-Vy = (BB.fv(:,:,2)./RHO.fv(:,:,2));
+Ur = (AA.fv(:,:,2)./RHO.fv(:,:,2));
+VT = (BB.fv(:,:,2)./RHO.fv(:,:,2));
 
-q2_ij = (Ux).^2 + (Vy).^2;
+q2_ij = (Ur).^2 + (VT).^2;
 
 folderName = ['M_' num2str(M0)];
-geomName = [case_name num2str(100*rem(tau,1))];
+geomName = [case_name num2str(100*rem(r_cyl,1))];
 
 if ~exist([pwd '\' geomName '\' folderName], 'dir')
     mkdir([pwd '\' geomName '\' folderName]);
@@ -226,7 +230,7 @@ saveas(gcf, [pwd '\' geomName '\' folderName '\residual_plot.pdf']);
 saveas(gcf, [pwd '\' geomName '\' folderName '\residual_plot']);
 
 % plot density
-figure();contourf(XX,YY,round(RHO.fv(:,:,2),3), 50)
+figure();contourf(GR.XX,GR.YY,round(RHO.fv(:,:,2),3), 50)
 title(['Density (Normalized), M=' num2str(M0)]);
 colorbar('eastoutside');
 axis equal
@@ -234,7 +238,7 @@ saveas(gcf, [pwd '\' geomName '\' folderName '\density.pdf']);
 saveas(gcf, [pwd '\' geomName '\' folderName '\density']);
 
 figure(); % cp plots
-contourf(XX, YY, 1-q2_ij, 50); %./((YY.*cos(XX)).^2)
+contourf(GR.XX, GR.YY, 1-q2_ij, 50); %./((YY.*cos(XX)).^2)
 title(['Pressure Coefficient Contours, M=' num2str(M0)]);
 colorbar('eastoutside');
 axis equal
@@ -242,7 +246,7 @@ saveas(gcf, [pwd '\' geomName '\' folderName '\cp_contour.pdf']);
 saveas(gcf, [pwd '\' geomName '\' folderName '\cp_contour']);
 
 figure(); % pressure
-contourf(XX, YY, PP.fv, 50);
+contourf(GR.XX, GR.YY, PP.fv, 50);
 title(['Pressure (Normalized), M=' num2str(M0)]);
 colorbar('eastoutside');
 axis equal
@@ -251,9 +255,9 @@ saveas(gcf, [pwd '\' geomName '\' folderName '\pressure']);
 
 figure();
 if M0>1 && solve_half
-    plot([fliplr(XX(:,end)'), fliplr(XX(1,:))], 1-[fliplr(q2_ij(:,end)'), fliplr(q2_ij(1,:))]); 
+    plot([fliplr(GR.XX(:,end)'), fliplr(GR.XX(1,:))], 1-[fliplr(q2_ij(:,end)'), fliplr(q2_ij(1,:))]); 
 else
-    plot([fliplr(XX(:,end)'), fliplr(XX(1,:)), XX(:,1)'], 1-[fliplr(q2_ij(:,end)'), fliplr(q2_ij(1,:)), q2_ij(:,1)']);
+    plot([fliplr(GR.XX(:,end)'), fliplr(GR.XX(1,:)), GR.XX(:,1)'], 1-[fliplr(q2_ij(:,end)'), fliplr(q2_ij(1,:)), q2_ij(:,1)']);
 end
 
 % plot([fliplr(XX(:,end)'), XX(1,:)], 1 - [fliplr(q2_ij(:,end)'), q2_ij(1,:)]);
@@ -276,14 +280,14 @@ saveas(gcf, [pwd '\' geomName '\' folderName '\cp_surf']);
 % saveas(gcf, [pwd '\' geomName '\' folderName '\phi_pot']);
 
 figure(); % theta-dir velocity plots
-contourf(XX, YY, Ux, 50); %./((YY.*cos(XX)).^2)
+contourf(GR.XX, GR.YY, Ur, 50); %./((YY.*cos(XX)).^2)
 title(['U velocity, M=' num2str(M0)]);
 colorbar('eastoutside');
 saveas(gcf, [pwd '\' geomName '\' folderName '\phi_theta.pdf']);
 saveas(gcf, [pwd '\' geomName '\' folderName '\phi_theta']);
 
 figure(); % theta-dir velocity plots
-contourf(XX, YY, Vy, 50); %./((YY.*cos(XX)).^2)
+contourf(GR.XX, GR.YY, VT, 50); %./((YY.*cos(XX)).^2)
 title(['V velocity, M=' num2str(M0)]);
 colorbar('eastoutside');
 saveas(gcf, [pwd '\' geomName '\' folderName '\phi_radius.pdf']);

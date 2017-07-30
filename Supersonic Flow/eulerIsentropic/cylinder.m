@@ -3,10 +3,10 @@ close all;
 clear;
 
 %% CT - simulation control, including tolerances, viscous factor gain, etc.
-eps_s = 0.000000005; % spatial diffusion term
-eps_t = 0.0000000013; % time diffusion term
+eps_s = 0.01; % spatial diffusion term
+eps_t = 0.0013; % time diffusion term
 tol = 1e-3;
-dt = 0.01^2;
+dt = 0.001;
 iter_min = 300;
 CFL_on = 1;
 
@@ -14,19 +14,19 @@ case_name = 'cylinder';
 
 %% FL - fluid parameters
 gam = 1.4; % heat 
-M0 = 0.15;
+M0 = 1.2;
 
 %% GR - grid information, such as the meshfield, grid spacing (dr, dT, etc.)
 
 % Define Grid
-dT = 0.01*pi;
-dr = 0.01;
+dT = 0.025*pi;
+dr = 0.05;
 
 r_cyl = 0.5;
 
 % Field Axis Values - body fitted grid
 R_range=[   r_cyl+0.5*dr,... % r_cyl
-            15];
+            50];
 T_range=[   0,...
             pi];
 
@@ -128,12 +128,12 @@ while (max(res(end, :)) > tol*max(res(:)))|| (size(res,1) < iter_min) % iterate 
     BB.grad_T = 0.5*(BB.grad_Tf + BB.grad_Tb);
 % 	laplace_RHO = laplace_f(RHO.fv(:,:,2), dT, dr, RHO.BC, GR.RR); % note -> need to figure out how to modify radial term for polar coordinates
     rr_n = [0.5.*(GR.RR(2:end,:) + GR.RR(1:(end-1),:)); 0.5.*((GR.RR(end,:)+dr) + GR.RR(end,:))];
-    rr_s = 0.5.*([2.*GR.RR(1,:); GR.RR(2:end,:) + GR.RR(1:(end-1),:)]);
+    rr_s = 0.5.*([2.*GR.RR(1,:)-dr; GR.RR(2:end,:) + GR.RR(1:(end-1),:)]);
     RHO.grad_Rf = [diff(RHO.fv(:,:,2), 1, 1)./dr; (RHO.BC.N - RHO.fv(end,:,2))./dr];
     RHO.grad_Rb = [RHO.BC.Sy; diff(RHO.fv(:,:,2), 1, 1)./dr];
     RHO.grad_RR = (rr_n.* RHO.grad_Rf - rr_s.*RHO.grad_Rb)./(dr .* GR.RR);
     RHO.grad_Tf = [diff(RHO.fv(:,:,2), 1,2)./dT, (RHO.fv(:,end-1,2) - RHO.fv(:,end,2))./dT];
-    RHO.grad_Tb = [(RHO.fv(:,end-1,2) - RHO.fv(:,end,2))./dT, diff(RHO.fv(:,:,2), 1,2)./dT];
+    RHO.grad_Tb = [(RHO.fv(:,1,2) - RHO.fv(:,2,2))./dT, diff(RHO.fv(:,:,2), 1,2)./dT];
     RHO.grad_TT = (RHO.grad_Tf - RHO.grad_Tb)./(dT .* GR.RR.^2);
     RHO.laplace = RHO.grad_RR + RHO.grad_TT;
     RHO.fv(:,:,3) = (eps_s.*RHO.laplace - rA.grad_R./GR.RR - BB.grad_T./GR.RR - (eps_t./(dt^2) - 0.5./dt).*RHO.fv(:,:,1) + 2.*eps_t.*RHO.fv(:,:,2)./(dt.^2))./(eps_t./(dt^2) + 0.5./dt);
@@ -164,7 +164,8 @@ while (max(res(end, :)) > tol*max(res(:)))|| (size(res,1) < iter_min) % iterate 
 %                 -2*V_T./(GR.RR.^2);
     UU.fv = AA.fv(:,:,2) ./ RHO.fv(:,:,2);
     UU.grad_Rf = [diff(UU.fv, 1, 1)./dr; (AA.BC.N - UU.fv(end,:))./dr];
-    UU.grad_Rb = [(UU.fv(1,:) - AA.BC.S)./(0.5*dr); diff(UU.fv, 1, 1)./dr];
+%     UU.grad_Rb = [(UU.fv(1,:) - AA.BC.S)./(0.5*dr); diff(UU.fv, 1, 1)./dr];
+    UU.grad_Rb = [(UU.fv(1,:) - (0.5*dr - 2*r_cyl)./(0.5*dr + 2*r_cyl).*((GR.RR(1,:))./(GR.RR(1,:)-dr)).^2.*UU.fv(1,:))./(dr); diff(UU.fv, 1, 1)./dr]; % reflection ratio?
     UU.grad_RR = (rr_n.* UU.grad_Rf - rr_s.*UU.grad_Rb)./(dr .* GR.RR);
     UU.grad_Tf = [diff(UU.fv, 1,2)./dT, (UU.fv(:,end-1) - UU.fv(:,end))./dT];
     UU.grad_Tb = [(UU.fv(:,1) - UU.fv(:,2))./dT, diff(UU.fv, 1,2)./dT];
@@ -189,14 +190,14 @@ while (max(res(end, :)) > tol*max(res(:)))|| (size(res,1) < iter_min) % iterate 
     rAB_R.grad_R = 0.5*(rAB_R.grad_Rf + rAB_R.grad_Rb);
 %     [B2_rho_T, ~, ~] = grad_f((BB.fv(:,:,2).^2)./RHO.fv(:,:,2), 2, dT, B2.BC, 1);
     B2_R.fv = BB.fv(:,:,2).^2 ./ RHO.fv(:,:,2);
-    B2_R.grad_Tf = [diff(B2_R.fv, 1,2)./dT, (-B2_R.fv(:,end-1) - B2_R.fv(:,end))./dT]; % mirrored/symmetry BC
-    B2_R.grad_Tb = [(B2_R.fv(:,1) + B2_R.fv(:,2))./dT, diff(B2_R.fv, 1,2)./dT];
+    B2_R.grad_Tf = [diff(B2_R.fv, 1,2)./dT, (B2_R.fv(:,end-1) - B2_R.fv(:,end))./dT]; % NOTE: NOTE A VECTOR... DO NOT MIRROR
+    B2_R.grad_Tb = [(B2_R.fv(:,1) - B2_R.fv(:,2))./dT, diff(B2_R.fv, 1,2)./dT];
     B2_R.grad_T = 0.5*(B2_R.grad_Tf + B2_R.grad_Tb);
 %     [U_T, ~, ~] = grad_f(AA.fv(:,:,2)./RHO.fv(:,:,2), 2, dT, AA.BC, 1);
     UU.grad_T = 0.5.*(UU.grad_Tf + UU.grad_Tb);
 %     laplace_B
     VV.grad_Rf = [diff(VV.fv, 1, 1)./dr; (BB.BC.N - VV.fv(end,:))./dr];
-    VV.grad_Rb = [BB.BC.Sy; diff(VV.fv, 1, 1)./dr]; % use reflection for the boundary condition, i.e. let the value above and below surface be equivalent
+    VV.grad_Rb = [(VV.fv(1,:) - (GR.RR(1,:))./(GR.RR(1,:)-dr).*VV.fv(1,:))./dr; diff(VV.fv, 1, 1)./dr]; % use reflection for the boundary condition, i.e. let the value above and below surface be equivalent
     VV.grad_RR = (rr_n.* VV.grad_Rf - rr_s.*VV.grad_Rb)./(dr .* GR.RR);
     VV.grad_TT = (VV.grad_Tf - VV.grad_Tb)./(dT .* GR.RR.^2);
     VV.laplace = VV.grad_RR + VV.grad_TT - VV.fv./(GR.RR.^2) - 2*UU.grad_T./(GR.RR.^2);
@@ -302,6 +303,7 @@ saveas(gcf, [pwd '\' geomName '\' folderName '\pressure.pdf']);
 saveas(gcf, [pwd '\' geomName '\' folderName '\pressure']);
 
 figure();
+solve_half = 0;
 if M0>1 && solve_half
     plot([fliplr(GR.XX(:,end)'), fliplr(GR.XX(1,:))], 1-[fliplr(q2_ij(:,end)'), fliplr(q2_ij(1,:))]); 
 else

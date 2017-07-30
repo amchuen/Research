@@ -9,7 +9,7 @@ function [fx_c, fx_f, fx_b]= grad_f(FF, DIR, dx, BC, enforce_cent_BC)
 
 %%%% Inputs:
 % * FF: field values
-% * dx: spacing in the x-direction (can be row or column, specified thru DIR)
+% * dx: spacing in the x-direction (can be single value, or sized equivalently to FF's size, specified thru DIR)
 % * DIR: specifies axis/direction by which the derivative is taken
 % * BC: struct input containing the neumann or dirichlet conditions 
 % * enforce: enforces the derivative at the BC for central difference
@@ -46,9 +46,11 @@ if DIR == 1 % gradient is in the y-direction
         end
         
         if strcmp(fnames{i}, 'S')
-            fx_b(1,:) = (FF(1,:) - BC.S)./dx;
+            % wall is usually assigned to this part of the field... want to
+            % change step-size to represent wall in-between grid
+            fx_b(1,:) = (FF(1,:) - BC.S)./(0.5*dx);
         elseif strcmp(fnames{i}, 'Sy')
-            fx_b(1,:) = BC.Sy;
+            fx_b(1,:) = BC.Sy; % assumes boundary body is between grid
             sy = 1;
         end
         
@@ -79,14 +81,18 @@ elseif DIR == 2 % gradient is in the x-direction ( or theta direction)
         if strcmp(fnames{i}, 'E')
             fx_f(:,end) = (BC.E - FF(:,end))./ dx(:,end);
         elseif strcmp(fnames{i}, 'Ex')
-            fx_f(:,end) = BC.Ex;
+            f_exit = BC.Ex .* (dx(:,end-1) + dx(:,end)) + FF(:,end-1);
+%             fx_f(:,end) = BC.Ex;
+            fx_f(:,end) = (f_exit - FF(:,end))./dx(:,end);
             ex = 1;
         end
         
         if strcmp(fnames{i}, 'W')
             fx_b(:,1) = (FF(:,1) - BC.W)./dx(:,1);
         elseif strcmp(fnames{i}, 'Wx')
-            fx_b(:,1) = BC.Wx;
+            f_west = FF(:,2) - BC.Wx.*2.*dx(:,2);
+            fx_b(:,1) = (FF(:,1) - f_west)./dx(:,1);
+%             fx_b(:,1) = BC.Wx;
             wx = 1;
         end
         
