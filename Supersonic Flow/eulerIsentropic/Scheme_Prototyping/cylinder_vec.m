@@ -3,14 +3,14 @@ close all;
 clear;
 
 %% CT - simulation control, including tolerances, viscous factor gain, etc.
-eps_s = 0.01; % spatial diffusion term
-eps_t = 0.0013; % time diffusion term
+eps_s = 0.025; % spatial diffusion term
+eps_t = 0.005; % time diffusion term
 tol = 1e-3;
-dt = 0.001;
+dt = 0.1;
 iter_min = 300;
 CFL_on = 1;
 
-case_name = 'cylinder_1visc';
+case_name = 'cylinder_vectorized';
 
 %% FL - fluid parameters
 gam = 1.4; % heat 
@@ -26,7 +26,7 @@ r_cyl = 0.5;
 
 % Field Axis Values - body fitted grid
 R_range=[   r_cyl+0.5*dr,... % r_cyl
-            50];
+            30];
 T_range=[   0,...
             pi];
         
@@ -224,10 +224,10 @@ end
 
 rho = EE.fv(:,:,1,2);
 aa = EE.fv(:,:,2,2);
-BB = EE.fv(:,:,3,2);
+bb = EE.fv(:,:,3,2);
 
-Ur = (AA./rho);
-VT = (BB./rho);
+Ur = (aa./rho);
+VT = (bb./rho);
 
 q2_ij = (Ur).^2 + (VT).^2;
 
