@@ -3,9 +3,9 @@ close all;
 clear;
 
 %% CT - simulation control, including tolerances, viscous factor gain, etc.
-eps_s = 0.025; % spatial diffusion term
+eps_s = 0.0725; % spatial diffusion term
 eps_t = 0.005; % time diffusion term
-tol = 1e-3;
+tol = 1e-4;
 dt = 0.1;
 iter_min = 300;
 CFL_on = 1;
@@ -14,19 +14,19 @@ case_name = 'cylinder_vectorized';
 
 %% FL - fluid parameters
 gam = 1.4; % heat 
-M0 = 1.2;
+M0 = 0.53;
 
 %% GR - grid information, such as the meshfield, grid spacing (dr, dT, etc.)
 
 % Define Grid
-dT = 0.025*pi;
-dr = 0.05;
+dT = 0.01*pi;
+dr = 0.025;
 
 r_cyl = 0.5;
 
 % Field Axis Values - body fitted grid
 R_range=[   r_cyl+0.5*dr,... % r_cyl
-            30];
+            15];
 T_range=[   0,...
             pi];
         
@@ -97,12 +97,12 @@ val_test = [0, 0, 1, 0];
 
 %% START SOLUTION
 
-res = [1, 1, 1];
+res = [0, 0, 0];
 tic;
 rr_n = repmat([0.5.*(GR.RR(2:end,:) + GR.RR(1:(end-1),:)); 0.5.*((GR.RR(end,:)+dr) + GR.RR(end,:))],1,1,3);
 rr_s = repmat(0.5.*([2.*GR.RR(1,:)-dr; GR.RR(2:end,:) + GR.RR(1:(end-1),:)]),1,1,3);
 RR = repmat(GR.RR, 1,1,3);
-while (max(res(end, :)) > tol*max(res(:)))|| (size(res,1) < iter_min) % iterate through time
+while (max(res(end, :)) > tol*max(res(res<1)))|| (size(res,1) < iter_min) % iterate through time
     
     %% Update
     EE.fv(:,:,:,1:2) = EE.fv(:,:,:,2:3);
@@ -199,7 +199,7 @@ while (max(res(end, :)) > tol*max(res(:)))|| (size(res,1) < iter_min) % iterate 
     A_err = (abs(EE.fv(:,:,2,3) - EE.fv(:,:,2,2)));
     B_err = (abs(EE.fv(:,:,3,3) - EE.fv(:,:,3,2)));
     
-    if (size(res,1) == 1) && all(res(end,:) == 1)
+    if (size(res,1) == 1) && all(res(end,:) == 0)
         res(1, :) = [max(R_err(:)), max(A_err(:)), max(B_err(:))]; 
     else
         res(end+1, :) = [max(R_err(:)), max(A_err(:)), max(B_err(:))];
@@ -233,9 +233,11 @@ q2_ij = (Ur).^2 + (VT).^2;
 
 folderName = ['M_' num2str(M0)];
 geomName = [case_name num2str(100*rem(r_cyl,1))];
+sizeName = [num2str(size(GR.RR,1)) '_' num2str(size(GR.RR,2)) '_' num2str(round(dr,3)) '_' num2str(round(dT,3))];
+dirName = [pwd '\' geomName '\' sizeName '\' folderName];
 
-if ~exist([pwd '\' geomName '\' folderName], 'dir')
-    mkdir([pwd '\' geomName '\' folderName]);
+if ~exist(dirName, 'dir')
+    mkdir(dirName);
 end
 
 close all;
@@ -249,32 +251,32 @@ title(['Residual Plot, M=' num2str(M0)]);
 xlabel('# of iterations');
 ylabel('Residual (Error)');
 
-saveas(gcf, [pwd '\' geomName '\' folderName '\residual_plot.pdf']);
-saveas(gcf, [pwd '\' geomName '\' folderName '\residual_plot']);
+saveas(gcf, [dirName '\residual_plot.pdf']);
+saveas(gcf, [dirName '\residual_plot']);
 
 % plot density
 figure();contourf(GR.XX,GR.YY,rho, 50)
 title(['Density (Normalized), M=' num2str(M0)]);
 colorbar('eastoutside');
 axis equal
-saveas(gcf, [pwd '\' geomName '\' folderName '\density.pdf']);
-saveas(gcf, [pwd '\' geomName '\' folderName '\density']);
+saveas(gcf, [dirName '\density.pdf']);
+saveas(gcf, [dirName '\density']);
 
 figure(); % cp plots
 contourf(GR.XX, GR.YY, 1-q2_ij, 50); %./((YY.*cos(XX)).^2)
 title(['Pressure Coefficient Contours, M=' num2str(M0)]);
 colorbar('eastoutside');
 axis equal
-saveas(gcf, [pwd '\' geomName '\' folderName '\cp_contour.pdf']);
-saveas(gcf, [pwd '\' geomName '\' folderName '\cp_contour']);
+saveas(gcf, [dirName '\cp_contour.pdf']);
+saveas(gcf, [dirName '\cp_contour']);
 
 figure(); % pressure
 contourf(GR.XX, GR.YY, PP.fv, 50);
 title(['Pressure (Normalized), M=' num2str(M0)]);
 colorbar('eastoutside');
 axis equal
-saveas(gcf, [pwd '\' geomName '\' folderName '\pressure.pdf']);
-saveas(gcf, [pwd '\' geomName '\' folderName '\pressure']);
+saveas(gcf, [dirName '\pressure.pdf']);
+saveas(gcf, [dirName '\pressure']);
 
 figure();
 solve_half = 0;
@@ -292,38 +294,38 @@ ylabel('C_p');
 title(['C_p on surface of Cylinder,, M=' num2str(M0)]);
 set(gca, 'Ydir', 'reverse');
 % axis equal
-saveas(gcf, [pwd '\' geomName '\' folderName '\cp_surf.pdf']);
-saveas(gcf, [pwd '\' geomName '\' folderName '\cp_surf']);
+saveas(gcf, [dirName '\cp_surf.pdf']);
+saveas(gcf, [dirName '\cp_surf']);
 
 % figure(); % field potential
 % contourf(XX, YY, round(PHI(:,:,end),5), 50);
 % title(['Field Potential, \Phi');
 % colorbar('eastoutside');
 % axis equal
-% saveas(gcf, [pwd '\' geomName '\' folderName '\phi_pot.pdf']);
-% saveas(gcf, [pwd '\' geomName '\' folderName '\phi_pot']);
+% saveas(gcf, [dirName '\phi_pot.pdf']);
+% saveas(gcf, [dirName '\phi_pot']);
 
 figure(); % theta-dir velocity plots
 contourf(GR.XX, GR.YY, Ur, 50); %./((YY.*cos(XX)).^2)
 title(['U velocity, M=' num2str(M0)]);
 colorbar('eastoutside');
-saveas(gcf, [pwd '\' geomName '\' folderName '\phi_theta.pdf']);
-saveas(gcf, [pwd '\' geomName '\' folderName '\phi_theta']);
+saveas(gcf, [dirName '\phi_theta.pdf']);
+saveas(gcf, [dirName '\phi_theta']);
 
 figure(); % theta-dir velocity plots
 contourf(GR.XX, GR.YY, VT, 50); %./((YY.*cos(XX)).^2)
 title(['V velocity, M=' num2str(M0)]);
 colorbar('eastoutside');
-saveas(gcf, [pwd '\' geomName '\' folderName '\phi_radius.pdf']);
-saveas(gcf, [pwd '\' geomName '\' folderName '\phi_radius']);
+saveas(gcf, [dirName '\phi_radius.pdf']);
+saveas(gcf, [dirName '\phi_radius']);
 
 % figure();
 % contourf(XX, YY, sqrt(M2_ij), 50);
 % title(['Mach Number');
 % colorbar('eastoutside');
 % axis equal
-% saveas(gcf, [pwd '\' geomName '\' folderName '\mach.pdf']);
-% saveas(gcf, [pwd '\' geomName '\' folderName '\mach']);
+% saveas(gcf, [dirName '\mach.pdf']);
+% saveas(gcf, [dirName '\mach']);
 
 % Save Results
-save([pwd '\' geomName '\' folderName '\results.mat']);
+save([dirName '\results.mat']);
