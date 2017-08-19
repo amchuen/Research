@@ -48,11 +48,21 @@ classdef fieldScalar %< handle
     end
    
     methods
-        function obj = fieldScalar(gr, fv, bc, ct)
+        function obj = fieldScalar(gr, bc, ct, varargin)
            obj.gr = gr;
-           obj.fv = fv;
            obj.bc = bc;
            obj.ct = ct;
+           
+           if ~isempty(varargin)
+               obj.fv = varargin{1};
+               
+           else
+               obj.fv = ones(size(obj.gr.d22));
+                            
+           end
+           
+           obj = obj.Gradient();
+           obj = obj.Laplacian();           
 
         end
 
@@ -81,18 +91,20 @@ classdef fieldScalar %< handle
         end
         
         function obj = Gradient(obj) % maybe should create a vector instead?
-            %% Solution
-            if length(size(obj.fv)) == 3
-                % means variable is being propagated using three-level
-                % scheme
-                FF = obj.fv(:,:,2);
-            else
-                % means variable is temporarily defined for current calc
-                FF = obj.fv;
-            end
-
+            % Solution
+%             if length(size(obj.fv)) == 3
+%                 % means vector does not have time dimension
+%                 % third dimension is not related to domain, but rather
+%                 % storage for variables
+%                 FF = obj.fv(:,:,:,2);
+%             else
+%                 % means variable does not have time aspect
+%                 FF = obj.fv;
+%             end
+            FF = obj.fv;
+            
             % Initialize Variables
-            obj.f_1f = zeros(size(obj.fv));
+            obj.f_1f = zeros(size(FF));
             obj.f_1b = obj.f_1f;
             obj.f_1 = obj.f_1f;
             obj.f_2f = obj.f_1f;
@@ -100,124 +112,270 @@ classdef fieldScalar %< handle
             obj.f_2 = obj.f_1f;
 
             % Calculate forward and backward 1st-order differences
-            obj.f_1f(1:(end-1),:) = (diff(FF,1,1)./obj.gr.d1);
-            obj.f_1b(2:end,:) = diff(FF,1,1)./obj.gr.d1;
+            obj.f_1f(1:(end-1),:,:) = (diff(FF,1,1)./obj.gr.d1);
+            obj.f_1b(2:end,:,:) = diff(FF,1,1)./obj.gr.d1;
             if obj.ct.is_polar
-                obj.f_2f(:,1:(end-1)) = (diff(FF,1,2)./(obj.gr.d2 .* obj.gr.RR(:,1:(end-1))));
-                obj.f_2b(:,2:end) = diff(FF,1,2)./(obj.gr.d2 .* obj.gr.RR(:,2:end));
+                obj.f_2f(:,1:(end-1),:) = (diff(FF,1,2)./(obj.gr.d2 .* obj.gr.RR(:,1:(end-1))));
+                obj.f_2b(:,2:end,:) = diff(FF,1,2)./(obj.gr.d2 .* obj.gr.RR(:,2:end));
             else
-                obj.f_2f(:,1:(end-1)) = (diff(FF,1,2)./obj.gr.d2);
-                obj.f_2b(:,2:end) = diff(FF,1,2)./obj.gr.d2;
+                obj.f_2f(:,1:(end-1),:) = (diff(FF,1,2)./obj.gr.d2);
+                obj.f_2b(:,2:end,:) = diff(FF,1,2)./obj.gr.d2;
             end
 
-            % control switches for enforcing neumann derivs if triggered
-            ny = 0; sy = 0; ex = 0; wx = 0;
-
-            % Loop through boundary conditions and apply as necessary
+            % Loop through boundary conditions and apply
             fnames = fieldnames(obj.bc);
-            for i = 1:length(fnames)
-                if strcmp(fnames{i}, 'N') % use loop to check for 
-                    obj.f_1f(end,:) = (obj.bc.N - FF(end,:))./obj.gr.d1;
-                elseif strcmp(fnames{i}, 'Ny')
-                    obj.f_1f(end,:) = obj.bc.Ny;
-                    ny = 1;
-                end
-
-                if strcmp(fnames{i}, 'S')
-                    % use reflective boundary condition if at wall
-                    % i.e. scalars are equivalent accross boundaries,
-                    obj.f_1b(1,:) = (FF(1,:) - BC.S)./obj.gr.d1;
-                elseif strcmp(fnames{i}, 'Sy')
-                    obj.f_1b(1,:) = BC.Sy; % assumes boundary body is between grid
-                    sy = 1;
-                end
-
-                if obj.ct.is_polar
-                    if strcmp(fnames{i}, 'E')
-                        obj.f_2f(:,end) = (obj.bc.E - FF(:,end))./(obj.gr.d2.*obj.gr.RR(:,end));
-                    elseif strcmp(fnames{i}, 'Ex')
-                        f_exit = obj.bc.Ex .* (2.*obj.gr.d2.*obj.gr.RR(:,end)) + FF(:,end-1);
-                        obj.f_2f(:,end) = (f_exit - FF(:,end))./(obj.gr.d.*obj.gr.RR(:,end));
-                        ex = 1;
-                    end
-
-                    if strcmp(fnames{i}, 'W')
-                        obj.f_2b(:,1) = (FF(:,1) - obj.bc.W)./(obj.gr.d2.*obj.gr.RR(:,end));
-                    elseif strcmp(fnames{i}, 'Wx')
-                        f_west = FF(:,2) - obj.bc.Wx.*2.*obj.gr.d2.*obj.gr.RR(:,end);
-                        obj.f_2b(:,1) = (FF(:,1) - f_west)./(obj.gr.d2.*obj.gr.RR(:,end));
-                        wx = 1;
-                    end
-
+            for i = 1:length(fnames) % loop through directions
+                % generate temporary array of values from
+                % scalars or vectors
+                if strcmp(obj.bc.(fnames{i}).physical, 'sym')
+                    BC_vals = obj.gen_symBC(FF, fnames{i}, obj.bc.(fnames{i}).numerical);
+                    
+                elseif strcmp(obj.bc.(fnames{i}).physical, 'wall')
+                    BC_vals = obj.gen_wallBC(FF, fnames{i}, obj.bc.(fnames{i}).numerical, obj.bc.(fnames{i}).val);
+                    
                 else
-                    if strcmp(fnames{i}, 'E')
-                        obj.f_2f(:,end) = (obj.bc.E - FF(:,end))./obj.gr.d2;
-                    elseif strcmp(fnames{i}, 'Ex')
-                        f_exit = obj.bc.Ex .* (2.*obj.gr.d2) + FF(:,end-1);
-                        obj.f_2f(:,end) = (f_exit - FF(:,end))./obj.gr.d2;
-                        ex = 1;
-                    end
-
-                    if strcmp(fnames{i}, 'W')
-                        obj.f_2b(:,1) = (FF(:,1) - obj.bc.W)./obj.gr.d2;
-                    elseif strcmp(fnames{i}, 'Wx')
-                        f_west = FF(:,2) - obj.bc.Wx.*2.*obj.gr.d2;
-                        obj.f_2b(:,1) = (FF(:,1) - f_west)./obj.gr.d2;
-                        wx = 1;
-                    end
-
+                    BC_vals = obj.gen_regBC(FF, fnames{i}, obj.bc.(fnames{i}).numerical, obj.bc.(fnames{i}).val);
+                    
+                end                       
+                
+                % assign the boundary conditions to the corresponding
+                % gradient matrices
+                switch fnames{i}
+                    case 'W'
+                        obj.f_2b(:,1,:) = BC_vals;
+                    case 'E'
+                        obj.f_2f(:,end,:) = BC_vals;
+                    case 'S'
+                        obj.f_1b(1,:,:) = BC_vals;
+                    case 'N'
+                        obj.f_1f(end,:,:) = BC_vals;
                 end
-
             end
 
             % Calculate Central Difference
             obj.f_1 = 0.5.*(obj.f_1f + obj.f_1b);
             obj.f_2 = 0.5.*(obj.f_2f + obj.f_2b);
-            
-            % enforce Neumann boundary conditions for central differences
-            if ny
-               obj.f_1(end,:) = obj.bc.Ny;
-            end
-
-            if sy
-               obj.f_1(1,:) = obj.bc.Sy;
-            end
-
-            if ex
-              obj.f_2(:,end) = obj.bc.Ex; 
-            end
-
-            if wx
-               obj.f_2(:,1) = obj.bc.Wx;
-            end
 
 
         end
-
-        function obj = step_time(obj, varargin)
-            % check for three-level
-            if length(size(obj.fv))~=3
-               error('This variable cannot be stepped forward in time!\n');
-            end
-
-            % calculate new "time-step"
-            summation = zeros(size(ob.fv(:,:,3)));
-            if ~isempty(varargin)
-                for i = 1:length(varargin)
-                    summation = summation + varargin{i};
-                end
-            end
-            obj.fv(:,:,3) = (obj.ct.eps_s.*obj.laplace - summation - (obj.ct.eps_t./(obj.ct.dt^2) - 0.5./obj.ct.dt).*obj.fv(:,:,1) + 2.*obj.ct.eps_t.*obj.fv(:,:,2)./(obj.ct.dt.^2))./(obj.ct.eps_t./(obj.ct.dt^2) + 0.5./obj.ct.dt);
-
-            % update three-level
-            obj.fv(:,:,1:2) = obj.fv(:,:,2:3);
-            
-            % update bounary conditions
-
-       end
        
        % function setup_bc(obj)
        
-   end
+    end
+
+    methods % three-level-scheme related operations
+        
+        function obj = update_fv(obj, updateVals)
+        % this function updates the field values for the fieldVector
+            obj.fv = updateVals;
+            
+            % re-calculate derivatives
+            obj = obj.Gradient();
+            obj = obj.Laplacian(); 
+        end
+        
+        function obj = update_bc(obj, dir, updateVals)
+           % need to somehow access boundary conditions easily at relevant
+           % locations based on wall and etc.
+           
+            for ii = 1:length(updateVals)
+                if ~isempty(updateVals{ii})
+                    obj.bc.(dir).val{ii} = updateVals{ii};
+                end
+            end
+            
+        end
+    end
+    
+    methods % helper functions for calculating the gradients
+        
+        function BC_vals = gen_symBC(obj, FF, dir, num_types)
+            BC_vals = [];
+            for ii = 1:size(obj.fv,3) % loop through vector "elements"
+                % symmetry will likely appear right on the
+                % boundary of the grid... maybe need to
+                % account for displaced symmetry?? 
+                switch dir
+                    case 'W'
+                        if strcmp(num_types{ii}, 'N')
+                            BC_vals = cat(3, BC_vals, (FF(:,1,ii) - FF(:,2,ii))./obj.gr.d2);
+                        elseif strcmp(num_types{ii}, 'D')
+                            BC_vals = cat(3, BC_vals, (FF(:,1,ii) + FF(:,2,ii))./obj.gr.d2);
+                        end 
+
+                    case 'E'
+                        if strcmp(num_types{ii}, 'N')
+                            BC_vals = cat(3, BC_vals, (FF(:,end-1,ii) - FF(:,end,ii))./obj.gr.d2);
+                        elseif strcmp(num_types{ii}, 'D')
+                            BC_vals = cat(3, BC_vals, (-FF(:,end-1,ii) - FF(:,end,ii))./obj.gr.d2);
+                        end
+
+                    case 'N'
+                        if strcmp(num_types{ii}, 'N')
+                            BC_vals = cat(3, BC_vals, (FF(end-1,:,ii) - FF(end,:,ii))./obj.gr.d1);
+                        elseif strcmp(num_types{ii}, 'D')
+                            BC_vals = cat(3, BC_vals, (-FF(end-1,:,ii) - FF(end,:,ii))./obj.gr.d1);
+                        end
+
+                    case 'S'
+                        if strcmp(num_types{ii}, 'N')
+                            BC_vals = cat(3, BC_vals, (FF(1,:,ii) - FF(2,:,ii))./obj.gr.d1);
+                        elseif strcmp(num_types{ii}, 'D')
+                            BC_vals = cat(3, BC_vals, (FF(1,:,ii) + FF(2,:,ii))./obj.gr.d1);
+                        end 
+                end
+
+            end
+            
+        end
+        
+        function BC_vals = gen_regBC(obj, FF, dir, num_types, vals)
+            BC_vals = [];
+            for ii = 1:size(obj.fv, 3)
+                switch dir
+                    case 'W'
+                        if isscalar(vals{ii})
+                            temp_BC = vals{ii}.*ones(size(obj.gr.d11(:,1)));
+                        else
+                            temp_BC = vals{ii};
+                        end
+                        
+                        % calculate boundary deriv
+                        if strcmp(num_types{ii}, 'N')
+                            f_BC = FF(:,2,ii) - temp_BC.*2.*obj.gr.d2;
+                            BC_vals = cat(3, BC_vals, (FF(:,1,ii) - f_BC)./obj.gr.d2);
+
+                        elseif strcmp(num_types{ii}, 'D')
+                            BC_vals = cat(3, BC_vals, (FF(:,1,ii) - temp_BC)./obj.gr.d2);
+
+                        end 
+
+                    case 'E'
+                        if isscalar(vals{ii})
+                            temp_BC = vals{ii}.*ones(size(obj.gr.d11(:,end)));
+                        else
+                            temp_BC = vals{ii};
+                        end
+                        
+                        % calculate boundary deriv
+                        if strcmp(num_types{ii}, 'N')
+                            f_BC = temp_BC.*2.*obj.gr.d2 + FF(:,end-1,ii);
+                            BC_vals = cat(3, BC_vals, (f_BC - FF(:,end,ii))./obj.gr.d2);
+
+                        elseif strcmp(num_types{ii}, 'D')
+                            BC_vals = cat(3, BC_vals, (temp_BC - FF(:,end,ii))./obj.gr.d2);
+
+                        end 
+                        
+                    case 'N'
+                        if isscalar(vals{ii})
+                            temp_BC = vals{ii}.*ones(size(obj.gr.d11(end,:)));
+                        else
+                            temp_BC = vals{ii};
+                        end
+                        
+                        % calculate boundary deriv
+                        if strcmp(num_types{ii}, 'N')
+                            f_BC = temp_BC.*2.*obj.gr.d2 + FF(end-1,:,ii);
+                            BC_vals = cat(3, BC_vals, (f_BC - FF(end,:,ii))./obj.gr.d1);
+
+                        elseif strcmp(num_types{ii}, 'D')
+                            BC_vals = cat(3, BC_vals, (temp_BC - FF(end,:,ii))./obj.gr.d1);
+
+                        end 
+                        
+                    case 'S'
+                        if isscalar(vals{ii})
+                            temp_BC = vals{ii}.*ones(size(obj.gr.d11(1,:)));
+                        else
+                            temp_BC = vals{ii};
+                        end
+                        
+                        % calculate boundary deriv
+                        if strcmp(num_types{ii}, 'N')
+                            f_BC = FF(2,:,ii) - temp_BC.*2.*obj.gr.d1;
+                            BC_vals = cat(3, BC_vals, (FF(1,:,ii) - f_BC)./obj.gr.d1);
+
+                        elseif strcmp(num_types{ii}, 'D')
+                            BC_vals = cat(3, BC_vals, (FF(1,:,ii) - temp_BC)./obj.gr.d1);
+
+                        end 
+                        
+                end
+           end
+        end
+        
+        function BC_vals = gen_wallBC(obj, FF, dir, num_types, vals)
+            BC_vals = [];
+            for ii = 1:size(obj.fv, 3)
+                switch dir
+                    case 'W'
+                        if isscalar(vals{ii})
+                            temp_BC = vals{ii}.*ones(size(obj.gr.d11(:,1)));
+                        else
+                            temp_BC = vals{ii};
+                        end
+                        
+                        % calculate boundary deriv
+                        if strcmp(num_types{ii}, 'N')
+                            BC_vals = cat(3, BC_vals, temp_BC);
+
+                        elseif strcmp(num_types{ii}, 'D')
+                            BC_vals = cat(3, BC_vals, (FF(:,1,ii) - temp_BC)./(0.5.*obj.gr.d2));
+
+                        end 
+
+                    case 'E'
+                        if isscalar(vals{ii})
+                            temp_BC = vals{ii}.*ones(size(obj.gr.d11(:,end)));
+                        else
+                            temp_BC = vals{ii};
+                        end
+                        
+                        % calculate boundary deriv
+                        if strcmp(num_types{ii}, 'N')
+                            BC_vals = cat(3, BC_vals, temp_BC);
+
+                        elseif strcmp(num_types{ii}, 'D')
+                            BC_vals = cat(3, BC_vals, (temp_BC - FF(:,end,ii))./(0.5.*obj.gr.d2));
+
+                        end 
+                        
+                    case 'N'
+                        if isscalar(vals{ii})
+                            temp_BC = vals{ii}.*ones(size(obj.gr.d11(end,:)));
+                        else
+                            temp_BC = vals{ii};
+                        end
+                        
+                        % calculate boundary deriv
+                        if strcmp(num_types{ii}, 'N')
+                            BC_vals = cat(3, BC_vals, temp_BC);
+
+                        elseif strcmp(num_types{ii}, 'D')
+                            BC_vals = cat(3, BC_vals, (temp_BC - FF(end,:,ii))./(0.5.*obj.gr.d1));
+
+                        end 
+                        
+                    case 'S'
+                        if isscalar(vals{ii})
+                            temp_BC = vals{ii}.*ones(size(obj.gr.d11(1,:)));
+                        else
+                            temp_BC = vals{ii};
+                        end
+                        
+                        % calculate boundary deriv
+                        if strcmp(num_types{ii}, 'N')
+                            BC_vals = cat(3, BC_vals, temp_BC); % need to switch order, or else derivs come out wrong!
+
+                        elseif strcmp(num_types{ii}, 'D')
+                            BC_vals = cat(3, BC_vals, (FF(1,:,ii) - temp_BC)./(0.5.*obj.gr.d1));
+
+                        end 
+                        
+                end
+            end
+        end
+    end
     
 end
