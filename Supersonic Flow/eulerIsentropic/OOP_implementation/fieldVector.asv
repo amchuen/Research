@@ -105,7 +105,7 @@ classdef fieldVector
             for i = 1:length(fnames) % loop through directions
                 % generate temporary array of values from
                 % scalars or vectors                
-                BC_vals = obj.getBCvals(FF, fnames{i});
+                BC_vals = obj.getBCvals(FF, dir);
                 
                 % assign the boundary conditions to the corresponding
                 % gradient matrices
@@ -137,7 +137,7 @@ classdef fieldVector
             if ((nargin == 1) && (length(size(obj.fv)) == 4))
                % vector has time dimension in it, and only needs to step
                % forward in time
-               obj.fv(:,:,:,1:end-1) = obj.fv(:,:,:,2:end);
+               obj.fv(:,:,:,1:2) = obj.fv(:,:,:,2:3);
             elseif ((nargin == 2))
                 % updated values must be passed into the new vector
                 for i = 1:length(updateVals)
@@ -224,62 +224,52 @@ classdef fieldVector
     
     methods % helper functions for calculating the gradients
         
-        function BC_vals = getBCvals(obj, FF, DIR)
+        function BC_vals = getBCvals(obj, FF, dir)
             
             % Setup output to proper size
-            if strcmpi(DIR, 'W') || strcmpi(DIR, 'E')
-                node_pts = obj.gr.d11(:,1);
-            elseif strcmpi(DIR, 'S') || strcmpi(DIR, 'N')
-                node_pts = obj.gr.d22(1,:);
+            if strcmpi(dir, 'W') || strcmpi(dir, 'E')
+                node_pts = obj.GR.d11(:,1);
+            elseif strcmpi(dir, 'S') || strcmpi(dir, 'N')
+                node_pts = obj.GR.d22(1,:);
             end
-            BC_vals = zeros([size(node_pts),size(obj.fv,3)]);
+            BC_vals = zeros([size(node_pts),3]);
             
-            verify = zeros(size(node_pts));
-            for i = 1:length(obj.bc.(DIR)) % loop through each subrange
+            
+            for i = 1:length(obj.bc.(dir)) % loop through each subrange
                 
                 % Extract the corresponding field values
-                if ~isempty(obj.bc.(DIR)(i).range)
-                    dim_idx = (node_pts > obj.bc.(DIR)(i).range(1)) & (node_pts < obj.bc.(DIR)(i).range(2));
-                    if strcmpi(DIR, 'W') || strcmpi(DIR, 'E')
+                if ~isempty(obj.bc.(dir)(i).ranges)
+                    min_val = ;
+                    max_val = obj.bc.(dir)(i).ranges(2);
+                    dim_idx = (node_pts > obj.bc.(dir)(i).ranges(1)) & (node_pts < max_val);
+                    if strcmpi(dir, 'W') || strcmpi(dir, 'E')
                         FF_sub = FF(dim_idx,:,:);
-                    elseif strcmpi(DIR, 'S') || strcmpi(DIR, 'N')
+                    elseif strcmpi(dir, 'S') || strcmpi(dir, 'N')
                         FF_sub = FF(:,dim_idx,:);
                     end
-                elseif isempty(obj.bc.(DIR)(i).range) || (length(obj.bc.(DIR)) == 1)
+                elseif isempty(obj.BC.(dir)(i).ranges) || (length(obj.bc.(dir)) == 1)
                     FF_sub = FF;
                     dim_idx = ones(size(node_pts));
                 else
                     error('Ranges not specified!\n');
                 end
                 
-                % calculate partitioned bc
-                if strcmp(obj.bc.(DIR)(i).physical, 'sym')
-                    BC_temp = obj.gen_symBC(FF_sub, DIR, obj.bc.(DIR)(i).numerical);
+                if strcmp(obj.bc.(dir)(i).physical, 'sym')
+                    BC_temp = obj.gen_symBC(FF_sub, dir, obj.bc.(dir)(i).numerical);
 
-                elseif strcmp(obj.bc.(DIR)(i).physical, 'wall')
-                    BC_temp = obj.gen_wallBC(FF_sub, DIR, obj.bc.(DIR)(i).numerical, obj.bc.(DIR)(i).val);
+                elseif strcmp(obj.bc.(dir)(i).physical, 'wall')
+                    BC_temp = obj.gen_wallBC(FF_sub, dir, obj.bc.(dir)(i).numerical, obj.bc.(dir)(i).val);
 
                 else
-                    BC_temp = obj.gen_regBC(FF_sub, DIR, obj.bc.(DIR)(i).numerical, obj.bc.(DIR)(i).val);
+                    BC_temp = obj.gen_regBC(FF_sub, dir, obj.bc.(dir)(i).numerical, obj.bc.(dir)(i).val);
                 end     
                 
-                % assign accordingly
-                if strcmpi(DIR, 'W') || strcmpi(DIR, 'E')
+                if strcmpi(dir, 'W') || strcmpi(dir, 'E')
                     BC_vals(dim_idx,:,:) = BC_temp;
-                elseif strcmpi(DIR, 'S') || strcmpi(DIR, 'N')
+                elseif strcmpi(dir, 'S') || strcmpi(dir, 'N')
                     BC_vals(:,dim_idx,:) = BC_temp;
                 end
-                
-                % verify that all points have been assigned?
-                verify = verify + dim_idx;
-            end
-            
-            if any(verify > 2)
-               error('Redefine ranges! Boundary conditions are overassigned at various points!\nDir: %s \n', DIR);
-            elseif any(verify == 0)
-                error('Redefine ranges! Boundary conditions are underassigned at various points!\nDir: %s \n', DIR);
-            end
-            
+            end            
         end
         
         function BC_vals = gen_symBC(obj, FF, dir, num_types)

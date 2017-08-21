@@ -1,4 +1,4 @@
-function BC = genBC(phys_types, vals, range, varargin)
+    function BC = genBC(phys_types, vals, range, varargin)
 % inputs:
     % - phys_types: physical boundaries of grid, each direction set should be
     % enclosed in cell for each element of input cell
@@ -8,7 +8,7 @@ function BC = genBC(phys_types, vals, range, varargin)
 
 BC = struct('W', struct, 'N', struct, 'E', struct, 'S', struct);
 for vec = 1:length(vals{1}{1})
-   BC(vec) = BC(1); 
+   obj.BC(vec) = obj.BC(1); 
 end
 % each dir should have the following fields
     % - physical type
@@ -23,18 +23,18 @@ for i = 1:length(dir) % loop through directions
     n_types = length(phys_types{i});
 
     for vec = 1:length(vals{1}{1}) % loop through the vectors
-        BC(vec).(dir{i}).physical = phys_types{i};
-        if (isempty(range)|| isempty(range{i})) && (n_types == 1) % assumes that there is only one BC at each direction
-            BC(vec).(dir{i}).range = {};
-        elseif (n_types > 1)
-            BC(vec).(dir{i}).range = range{i};
-        else
-            error('Please enter ranges!\n');
-        end
         
         for ii = 1:n_types % loop through types at each direction
             % default properties
-            BC(vec).(dir{i}).update{ii} = 0;
+            obj.BC(vec).(dir{i})(ii).update{ii} = 0;
+            obj.BC(vec).(dir{i})(ii).physical = phys_types{i}{ii};
+            if (isempty(range)|| isempty(range{i})) && (n_types == 1) % assumes that there is only one BC at each direction
+                obj.BC(vec).(dir{i})(ii).range = {};
+            elseif (n_types > 1)
+                obj.BC(vec).(dir{i})(ii).range = range{i}{ii};
+            else
+                error('Please enter ranges!\n');
+            end
 
             switch phys_types{i}{ii}
                 case 'wall'          
@@ -47,37 +47,37 @@ for i = 1:length(dir) % loop through directions
                     end
 
                     % check if wall is zero or a linearized BC
-                    BC(vec).(dir{i}).update{ii} = ~all(vals{i}{ii}{wall_vec} == 0);
+                    obj.BC(vec).(dir{i})(ii).update{ii} = ~all(vals{i}{ii}{wall_vec} == 0);
 
                     if vec == wall_vec
-                        BC(vec).(dir{i}).numerical{ii} = repmat({'D'}, 1, length(vals{1}{1}));
-                        BC(vec).(dir{i}).val{ii} = repmat({vals{i}{ii}{vec}}, 1, length(vals{1}{1}));
-                        BC(vec).(dir{i}).val{ii}{vec} = BC(vec).(dir{i}).val{ii}{vec}.*vals{i}{ii}{vec};
+                        obj.BC(vec).(dir{i})(ii).numerical = repmat({'D'}, 1, length(vals{1}{1}));
+                        obj.BC(vec).(dir{i})(ii).val= repmat({vals{i}{ii}{vec}}, 1, length(vals{1}{1}));
+                        obj.BC(vec).(dir{i})(ii).val{vec} = obj.BC(vec).(dir{i})(ii).val{vec}.*vals{i}{ii}{vec};
 
                     else
-                        BC(vec).(dir{i}).numerical{ii} = repmat({'N'}, 1, length(vals{1}{1}));
-                        BC(vec).(dir{i}).numerical{ii}{wall_vec} = 'D';
-                        BC(vec).(dir{i}).val{ii} = vals{i}{ii};
+                        obj.BC(vec).(dir{i})(ii).numerical = repmat({'N'}, 1, length(vals{1}{1}));
+                        obj.BC(vec).(dir{i})(ii).numerical{wall_vec} = 'D';
+                        obj.BC(vec).(dir{i})(ii).val = vals{i}{ii};
                     end
 
                 case 'inlet'
-                    BC(vec).(dir{i}).numerical{ii} = repmat({'D'}, 1, length(vals{1}{1}));
-                    BC(vec).(dir{i}).val{ii} = vals{i}{ii};
+                    obj.BC(vec).(dir{i})(ii).numerical = repmat({'D'}, 1, length(vals{1}{1}));
+                    obj.BC(vec).(dir{i})(ii).val = vals{i}{ii};
 
                     for iii = 1:length(vals{i}{ii}) % loop through elements of vector
-                       BC(vec).(dir{i}).val{ii}{iii} = BC(vec).(dir{i}).val{ii}{iii} .* vals{i}{ii}{vec} ./ vals{i}{ii}{1};
+                       obj.BC(vec).(dir{i})(ii).val{iii} = obj.BC(vec).(dir{i})(ii).val{iii} .* vals{i}{ii}{vec} ./ vals{i}{ii}{1};
                     end
 
                 case 'outlet'
-                    BC(vec).(dir{i}).numerical{ii} = repmat({'N'}, 1, length(vals{1}{1}));
-                    BC(vec).(dir{i}).val{ii} = {0,0,0};
+                    obj.BC(vec).(dir{i})(ii).numerical = repmat({'N'}, 1, length(vals{1}{1}));
+                    obj.BC(vec).(dir{i})(ii).val = {0,0,0};
 
                 case 'far-field'
-                    BC(vec).(dir{i}).numerical{ii} = repmat({'D'}, 1, length(vals{1}{1}));
-                    BC(vec).(dir{i}).val{ii} = vals{i}{ii};
+                    obj.BC(vec).(dir{i})(ii).numerical = repmat({'D'}, 1, length(vals{1}{1}));
+                    obj.BC(vec).(dir{i})(ii).val = vals{i}{ii};
 
                     for iii = 1:length(vals{i}{ii}) % loop through elements of vector
-                       BC(vec).(dir{i}).val{ii}{iii} = BC(vec).(dir{i}).val{ii}{iii} .* vals{i}{ii}{vec} ./ vals{i}{ii}{1};
+                       obj.BC(vec).(dir{i})(ii).val{iii} = obj.BC(vec).(dir{i})(ii).val{iii} .* vals{i}{ii}{vec} ./ vals{i}{ii}{1};
                     end
                     
                 case 'sym'
@@ -96,16 +96,16 @@ for i = 1:length(dir) % loop through directions
                         sym_vec = 3;
                     end
                     
-                    BC(vec).(dir{i}).numerical{ii} = repmat({'N'}, 1, length(vals{1}{1}));
-                    BC(vec).(dir{i}).numerical{ii}{sym_vec} = 'D';
+                    obj.BC(vec).(dir{i})(ii).numerical = repmat({'N'}, 1, length(vals{1}{1}));
+                    obj.BC(vec).(dir{i})(ii).numerical{sym_vec} = 'D';
 
                 case 'patch'
-                    BC(vec).(dir{i}).update{ii} = 1;
-                    BC(vec).(dir{i}).numerical{ii} = repmat({'D'}, 1, length(vals{1}{1}));
-                    BC(vec).(dir{i}).val{ii} = vals{i}{ii}; % initial values given assumed to be similar to initial condition values
+                    obj.BC(vec).(dir{i})(ii).update{ii} = 1;
+                    obj.BC(vec).(dir{i})(ii).numerical = repmat({'D'}, 1, length(vals{1}{1}));
+                    obj.BC(vec).(dir{i})(ii).val = vals{i}{ii}; % initial values given assumed to be similar to initial condition values
 
                     for iii = 1:length(vals{i}{ii}) % loop through elements of vector
-                       BC(vec).(dir{i}).val{ii}{iii} = BC(vec).(dir{i}).val{ii}{iii} .* vals{i}{ii}{vec} ./ vals{i}{ii}{1};
+                       obj.BC(vec).(dir{i})(ii).val{iii} = obj.BC(vec).(dir{i})(ii).val{iii} .* vals{i}{ii}{vec} ./ vals{i}{ii}{1};
                     end
             end
         end

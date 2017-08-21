@@ -30,20 +30,38 @@ for i = 2:(length(YY_B)-1)
    dyBdx(i+1) = (YY_B(i) - YY_B(i-1))/(2*dx);
 end
 
+%% CTRL
+CT.eps_s = 0.001;% 0.07525; % spatial diffusion term
+CT.eps_t = 0.013;  % time diffusion term
+CT.tol = 1e-7;
+CT.dt = 0.1;
+CT.iter_min = 300;
+CT.CFL_on = 1;
+CT.use_1visc = 1;
+CT.is_polar = 0;
+CT.case_name = 'cylinder_vec_1visc';
+
+%% Fluid Params
+FL.M0 = 3.0;
+FL.gam = 1.4;
+
 %% Test genBC
 
-phys_types = {  {'inlet'},...
+BC_setup.phys_types = {  {'inlet'},...
                 {'patch'},...
                 {'wall', 'outlet'},...
                 {'wall'}};
-vals = {{{1,1,0}},...
+BC_setup.vals = {{{1,1,0}},...
         {{1,1,0}},...
         {{0,0,0}},...
         {{0,0,dyBdx}}};
     
-range = {   {},...
+BC_setup.ranges = {   {},...
             {},...
-            {[0, 0.5], [0.5+dy, grid_lims(1,2)]},...
+            {[0, 0.1], [0.1, 0.2]},...
             {}};
+        
+test = eulerIsentropicField(CT, grid_lims(:,:,1), FL, BC_setup);
+% BC_setup = {phys_types, vals, range};
 
-BC = genBC(phys_types, vals, range);
+% BC = genBC(phys_types, vals, range);
