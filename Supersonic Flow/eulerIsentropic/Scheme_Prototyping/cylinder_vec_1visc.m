@@ -3,14 +3,15 @@ close all;
 clear;
 
 %% CT - simulation control, including tolerances, viscous factor gain, etc.
-eps_s = 0.0725; % spatial diffusion term
+eps_s = 0.0525; % spatial diffusion term
 eps_t = 0.005; % time diffusion term
 tol = 1e-4;
 dt = 0.1;
 iter_min = 300;
 CFL_on = 1;
+use_1visc = 1;
 
-case_name = 'cylinder_vectorized';
+case_name = 'cylinder_vec_1visc';
 
 %% FL - fluid parameters
 gam = 1.4; % heat 
@@ -26,7 +27,7 @@ r_cyl = 0.5;
 
 % Field Axis Values - body fitted grid
 R_range=[   r_cyl+0.5*dr,... % r_cyl
-            15];
+            50];
 T_range=[   0,...
             pi];
         
@@ -102,6 +103,8 @@ tic;
 rr_n = repmat([0.5.*(GR.RR(2:end,:) + GR.RR(1:(end-1),:)); 0.5.*((GR.RR(end,:)+dr) + GR.RR(end,:))],1,1,3);
 rr_s = repmat(0.5.*([2.*GR.RR(1,:)-dr; GR.RR(2:end,:) + GR.RR(1:(end-1),:)]),1,1,3);
 RR = repmat(GR.RR, 1,1,3);
+alpha = cat(3, zeros(size(GR.RR)), 1./(RR(:,:,2:3).^2));
+DF_coeff = ((rr_n + rr_s)./(dr^2 .* RR) + 2./(RR.^2 .* dT^2) + alpha);
 while (max(res(end, :)) > tol*max(res(res<1)))|| (size(res,1) < iter_min) % iterate through time
     
     %% Update
@@ -159,6 +162,9 @@ while (max(res(end, :)) > tol*max(res(res<1)))|| (size(res,1) < iter_min) % iter
 %                    - cat(3,zeros(size(GR.RR)), 0.5.*EE.fv(:,:,2:3,1))./(RR.^2)... % E-tilde
 %                    + (2.*cat(3, zeros(size(GR.RR)), -EE.grad_T(:,:,3), EE.grad_T(:,:,2)))./(RR.^2); % angular deriv for vector laplacian
     EE.laplacian = EE.laplace_R + EE.laplace_T - cat(3,zeros(size(GR.RR)), EE.fv(:,:,2:3,2))./(RR.^2) + (2.*cat(3, zeros(size(GR.RR)), -EE.grad_T(:,:,3), EE.grad_T(:,:,2)))./(RR.^2);
+    if use_1visc
+        EE.laplacian = EE.laplacian + DF_coeff.*(EE.fv(:,:,:,2) - 0.5.*(EE.fv(:,:,:,1)));
+    end
     
     %% Pressure Terms
     PP.grad_Rf = [diff(PP.fv, 1, 1)./dr; (PP.BC.N - PP.fv(end,:))./dr];
@@ -172,10 +178,16 @@ while (max(res(end, :)) > tol*max(res(res<1)))|| (size(res,1) < iter_min) % iter
     PP.grad = cat(3, zeros(size(GR.RR)), PP.grad_R, PP.grad_T./GR.RR);
     
     %% Step forward in time
-%     EE.fv(:,:,:,3) = (eps_s .* EE.laplacian - PP.grad - (FF.grad_R + GG.grad_T)./RR - MM.fv)./...
-%                     (0.5/dt + 0.5.*eps_s.*((rr_n + rr_s)./(RR.*dr^2)+2./(RR.^2 .* dT^2) + cat(3,zeros(size(GR.RR)), 1./RR(:,:,2:3))));
     
-    EE.fv(:,:,:,3) = (eps_s .* EE.laplacian - PP.grad - (FF.grad_R + GG.grad_T)./RR - MM.fv + 2*eps_t./(dt^2).*EE.fv(:,:,:,2) - (eps_t./(dt^2) - 0.5/dt).*EE.fv(:,:,:,1))./(eps_t./(dt^2) + 0.5/dt);
+    if use_1visc
+        EE.fv(:,:,:,3) = (eps_s.*EE.laplacian - PP.grad - (FF.grad_R + GG.grad_T)./RR - MM.fv + 0.5.*EE.fv(:,:,:,1)./dt)./...
+                    (0.5./dt + 0.5.*eps_s.*DF_coeff);
+    else
+        EE.fv(:,:,:,3) = (eps_s .* EE.laplacian - PP.grad - (FF.grad_R + GG.grad_T)./RR - MM.fv)./...
+                    (0.5/dt + 0.5.*eps_s.*((rr_n + rr_s)./(RR.*dr^2)+2./(RR.^2 .* dT^2) + cat(3,zeros(size(GR.RR)), 1./RR(:,:,2:3))));
+    end
+    
+%     EE.fv(:,:,:,3) = (eps_s .* EE.laplacian - PP.grad - (FF.grad_R + GG.grad_T)./RR - MM.fv + 2*eps_t./(dt^2).*EE.fv(:,:,:,2) - (eps_t./(dt^2) - 0.5/dt).*EE.fv(:,:,:,1))./(eps_t./(dt^2) + 0.5/dt);
     
     if any(any(max(abs(EE.fv(:,:,3,end)./EE.fv(:,:,1,end)))>10))
        fprintf('Check Tangential veocity!\n');

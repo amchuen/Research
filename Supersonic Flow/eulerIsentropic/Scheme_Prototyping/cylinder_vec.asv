@@ -10,7 +10,7 @@ dt = 0.1;
 iter_min = 300;
 CFL_on = 1;
 
-case_name = 'cylinder_vectorized';
+case_name = 'cylinder_vect_1visc';
 
 %% FL - fluid parameters
 gam = 1.4; % heat 
