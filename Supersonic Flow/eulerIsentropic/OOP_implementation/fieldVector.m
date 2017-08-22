@@ -149,13 +149,13 @@ classdef fieldVector
             end            
         end
         
-        function obj = update_bc(obj, dir, updateVals)
+        function obj = update_bc(obj, dir, bcIdx, updateVals)
            % need to somehow access boundary conditions easily at relevant
            % locations based on wall and etc.
            
             for ii = 1:length(updateVals)
                 if ~isempty(updateVals{ii})
-                    obj.bc.(dir).val{ii} = updateVals{ii};
+                    obj.bc.(dir)(bcIdx).val{ii} = updateVals{ii};
                 end
             end
             
@@ -163,58 +163,71 @@ classdef fieldVector
     end
     
     methods % getter functions
-        function output = get_boundVal(obj, dir, varargin)
+        function output = get_boundVal(obj, DIR, tIdx, eIdx, varargin)
             % INPUTS: 
-                % varargin - 1st input is time index
-                %           2nd input is the element index
+                % varargin -    1st input is rangeMin
+                %               2nd input is rangeMax
+                %               3rd input is patch depth
             
             % Parse variable inputs for time and element indexing
             % information
-            t_dim = [];
-            elem = [];
+            if strcmpi(DIR, 'W') && strcmpi(DIR, 'E')
+                rMin = ones(size(obj.gr.d1vals));
+                rMax = ones(size(obj.gr.d1vals));
+            elseif strcmpi(DIR, 'S') && strcmpi(DIR, 'N')
+                rMin = ones(size(obj.gr.d2vals));
+                rMax = ones(size(obj.gr.d2vals));
+            end
             if ~isempty(varargin)
                 if ~isempty(varargin{1})
-                    t_dim = varargin{1};
+                    rMin = obj.gr.d1vals > varargin{1};
                 end
-                if length(varargin) >= 2
-                    elem = varargin{2};
+                if ~isempty(varargin{2})
+                    rMax = obj.gr.d1vals < varargin{2};
+                end
+                
+                if ~isempty(varargin{3}) && (varargin{3} == 'p')
+                    depth = 2;
+                else
+                    depth = 1;
                 end
             end
             
+            outIdx = find(rMin & rMax);
+            
             % If time is still empty, select default time
-            if isempty(t_dim)
-                switch length(size(obj.fv))
-                    case 4
-                        t_dim = 2;
-                    case 3
-                        t_dim = 1;
+            if isempty(tIdx)
+                if length(size(obj.fv)) == 4
+                    tIdx = 2;
+                else
+                    tIdx = 1;
                 end
             end
             
             % Perform boundary value extraction
-            switch dir
+            switch DIR
                case 'W'
-                   output = obj.fv(:,1,:,t_dim);
+                   output = obj.fv(outIdx,depth,:,tIdx);
                case 'E'
-                   output = obj.fv(:,end,:,t_dim);
+                   output = obj.fv(outIdx,end+1 - depth,:,tIdx);
                case 'S'
-                   output = obj.fv(1,:,:,t_dim);
+                   output = obj.fv(depth,outIdx,:,tIdx);
                case 'N'
-                   output = obj.fv(end,:,:,t_dim);
+                   output = obj.fv(end+1 - depth,outIdx,:,tIdx);
             end
             
             % Select element if specified
-            if ~isempty(elem)
-                output = output(:,:,elem);
+            if ~isempty(eIdx)
+                output = output(:,:,eIdx);
             end
         end
         
-        function output = get_boundCondVal(obj, dir, varargin)
+        function output = get_boundCondVal(obj, DIR, bcIdx, varargin)
             % OUTPUT: this function outputs the bc values for the given
             % direction
-            output = obj.bc.(dir).val;
+            output = obj.bc.(DIR)(bcIdx).val;
             
-            if ~isempty(varargin)
+            if ~isempty(varargin{1})
                 output = output{varargin{1}};
             end
             

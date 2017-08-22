@@ -324,74 +324,30 @@ classdef eulerIsentropicField < handle
             
             fnames = fieldnames(obj.BC);
             for i = 1:length(fnames) % loop through each direction
-                
-                if obj.BC(1).(fnames{i}).update
-                    
-                    switch obj.BC(1).(fnames{i}).physical
-                        case 'wall'
-                            obj = obj.updateWallBC(fnames{i});
-                            
-                        case 'patch'
-                            
-                            % first match the boundaries
-                            % assume each cell of varargin represents the
-                            % other corresponding objects
-                            
-                            % test for matrix size, array distance, and
-                            % opposite side
-                            for fv = 1:length(others)
-                                switch fnames{i}
-                                    case 'W'
-                                        test_dir = 'E';
-                                        test_home = obj.GR.d22(:,1);
-                                        test_patch = others(fv).GR.d22(:,end);
-                                        test_dx = obj.GR.d2;
-                                    case 'E'
-                                        test_dir = 'W';
-                                        test_home = obj.GR.d22(:,end);
-                                        test_patch = others(fv).GR.d22(:,1);
-                                        test_dx = obj.GR.d2;
-                                    case 'S'
-                                        test_dir = 'N';
-                                        test_home = obj.GR.d11(1,:);
-                                        test_patch = others(fv).GR.d11(end,:);
-                                        test_dx = obj.GR.d1;
-                                    case 'N'
-                                        test_dir = 'S';
-                                        test_home = obj.GR.d11(end,:);
-                                        test_patch = others(fv).GR.d11(1,:);
-                                        test_dx = obj.GR.d1;
-                                end
-                                
-                                if (length(test_home) ~= length(test_patch))
-                                    continue;
-                                    
-                                elseif (abs(max(abs(test_home - test_patch)) - test_dx) < 1e-8)
-%                                     BC_vals = others(fv).FV(1).get_boundVal(test_dir);
-                                    break;
-                                end
-                                
-                            end
-                            
-                            % update boundary condition
-                            for vec = 1:length(obj.FV) % loop through vectors
-                                BC_vals = others(fv).FV(vec).get_boundVal(test_dir);
-                                obj.FV(vec) = obj.FV(vec).update_bc(fnames{i}, mat2cell(BC_vals, size(BC_vals,1), size(BC_vals,2), ones(1, size(BC_vals,3))));
-                            end                           
+                for bcIdx = 1:length(obj.BC(1).(fnames{i})) % loop through mixed types if more than one!
+                    if obj.BC(1).(fnames{i})(bcIdx).update
+
+                        switch obj.BC(1).(fnames{i})(bcIdx).physical
+                            case 'wall'
+                                obj = obj.updateWallBC(fnames{i}, bcIdx);
+
+                            case 'patch'
+                                obj = obj.updatePatchBC(others, DIR, bcIdx);                          
+                        end
                     end
                 end
             end            
         end
         
-        function obj = updateWallBC(obj, dir)
+        function obj = updateWallBC(obj, DIR, bcIdx)
             % must update rho * vel for normal velocity
             % then apply to other vectors
             
             % get old density
-            d0 = obj.FV(1).get_boundVal(dir, 1,1); % t1
+            d0 = obj.FV(1).get_boundVal(DIR, 1,1, obj.BC(1).dir(bcIdx).range(1), obj.BC(1).dir(bcIdx).range(2)); % t1
 
             % get wall normal velocity for updating
-            wall_loc = strcmpi(obj.BC(1).(dir).numerical, 'D');
+            wall_loc = strcmpi(obj.BC(1).(DIR)(bcIdx).numerical, 'D');
             wall_dir = find(wall_loc);
             for vec = 1:length(obj.FV)
                 update_vals = [];
@@ -399,16 +355,72 @@ classdef eulerIsentropicField < handle
                 
                 if vec ~= wall_dir
                     % update for element direction that is normal to the wall
-                    update_vals = obj.FV(1).get_boundVal(dir,[],vec).*obj.FV(1).get_boundCondVal(dir, wall_dir)./d0; 
-                    update_cell{wall_dir} = update_vals;
+                    update_vals = obj.FV(1).get_boundVal(DIR,[],vec, obj.BC(1).dir(bcIdx).range(1), obj.BC(1).dir(bcIdx).range(2))...
+                                .*obj.FV(1).get_boundCondVal(DIR, bcIdx, wall_dir)./d0; 
+                    update_cell{wall_dir} = update_vals; % if not at normal vel, just need to update the one dirichlet boundary
                 else
                     % we are at the vector that corresponds to normal wall vel
-                    update_vals = obj.FV(1).get_boundVal(dir).*repmat(obj.FV(1).get_boundCondVal(dir, wall_dir)./d0, 1,1,size(obj.FV(1).fv,3)); 
+                    update_vals = obj.FV(1).get_boundVal(DIR,[],[],obj.BC(1).dir(bcIdx).range(1), obj.BC(1).dir(bcIdx).range(2))...
+                                .*repmat(obj.FV(1).get_boundCondVal(DIR, bcIdx, wall_dir)./d0, 1,1,size(obj.FV(1).fv,3)); 
                     update_cell = mat2cell(update_vals, size(update_vals,1), size(update_vals,2), ones(1,size(update_vals,3)));
                 end
                 
-                obj.FV(vec) = obj.FV(vec).update_bc(dir, update_cell);
+                obj.FV(vec) = obj.FV(vec).update_bc(DIR, bcIdx, update_cell);
             end
+        end
+        
+        function obj = updatePatchBC(obj, others, DIR, bcIdx)
+            % first match the boundaries
+            % assume each cell of varargin represents the
+            % other corresponding objects
+
+            % test for matrix size, array distance, and
+            % opposite side... grids should have intersecting sides!
+            bf = 0;
+            for fv = 1:length(others)
+                switch DIR
+                    case 'W'
+                        test_dir = 'E';
+                        test_home = obj.GR.d22(1,1);
+                        test_patch = others(fv).GR.d22(1,end);
+                    case 'E'
+                        test_dir = 'W';
+                        test_home = obj.GR.d22(1,end);
+                        test_patch = others(fv).GR.d22(1,1);
+                    case 'S'
+                        test_dir = 'N';
+                        test_home = obj.GR.d11(1,1);
+                        test_patch = others(fv).GR.d11(end,1);
+                    case 'N'
+                        test_dir = 'S';
+                        test_home = obj.GR.d11(end,1);
+                        test_patch = others(fv).GR.d11(1,1);
+                end
+                
+                % test for boundary intersection
+                for ii = 1:length(others(fv).BC(1).(test_dir)) % loop through other grid's BC ranges
+                    patch_range = others(fv).BC(1).(test_dir)(ii).range;
+                    home_range = obj.BC(1).(DIR)(bcIdx).range;
+                    if (test_home == test_patch) && (home_range == patch_range) % i.e. node point ranges match
+                        bf = 1;
+                        break;
+                    end
+                end
+
+                if bf
+                    break;
+                end
+
+            end
+
+            % update boundary condition
+            BC_vals = others(fv).FV(1).get_boundVal(test_dir, [], [], others(fv).BC(1).(test_dir)(ii).range(1), others(fv).BC(1).(test_dir)(ii).range(2), 'p');
+            density = repmat(BC_vals(:,:,1), 1, 1, 3);
+            for vec = 1:length(obj.FV) % loop through vectors
+                var = repmat(BC_vals(:,:,vec), 1, 1, 3);
+                obj.FV(vec) = obj.FV(vec).update_bc(DIR, bcIdx, mat2cell(BC_vals.*var./density, size(BC_vals,1), size(BC_vals,2), ones(1, size(BC_vals,3))));
+            end  
+            
         end
         
         function obj = CFLcheck(obj)
