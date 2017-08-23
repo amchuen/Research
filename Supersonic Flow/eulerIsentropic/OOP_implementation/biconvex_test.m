@@ -1,8 +1,8 @@
 clc;
-close all;
 clear;
+close all;
 
-case_name = 'test_object';
+case_name = 'biconvex';
 
 %% Define grid_lims
 
@@ -10,14 +10,8 @@ dx = 0.05;
 dy = 0.08;
 
 % Field Axis Values - body fitted grid
-grid_lims = [   0+0.5*dy,  15.0-0.5*dy, dy; % y-range
-                -5+(0.5*dx), 10-(0.5.*dx),    dx];... 
-
-grid_lims(:,:,2) = [    0.2+0.5.*dy-mod(0.2,dy),  1.0, dy; % y-range
-                        0.0+(0.5*dx), 0.6-(0.5.*dx),    dx];... 
-                        
-grid_lims(:,:,3) = [    0.2+0.5.*dy-mod(0.2,dy),  1.0, dy;
-                        0.6+(0.5.*dx)-mod(0.6,dx), 3.0, dx];
+grid_lims = [   0  15, dy; % y-range
+                -39*dx, 10,    dx];... 
 
 %% Airfoil Geometry
 
@@ -32,10 +26,11 @@ for i = 2:(length(YY_B)-1)
    dyBdx(i+1) = (YY_B(i) - YY_B(i-1))/(2*dx);
 end
 
-%% CTRL
-CT.eps_s = 0.1; %0.07525; % spatial diffusion term
+%% Control Params - simulation control, including tolerances, viscous factor gain, etc.
+
+CT.eps_s = 0.001;% 0.07525; % spatial diffusion term
 CT.eps_t = 0.013;  % time diffusion term
-CT.tol = 1e-6;
+CT.tol = 1e-7;
 CT.dt = 0.1;
 CT.iter_min = 300;
 CT.CFL_on = 1;
@@ -44,24 +39,16 @@ CT.is_polar = 0;
 CT.case_name = 'cylinder_vec_1visc';
 
 %% Fluid Params
-FL.M0 = 1.01;
+FL.M0 = 0.95;
 FL.gam = 1.4;
 
-%% Test genBC
+%% Boundary Condition Setup
 
-BC_setup.phys_types = {  {'inlet'},...
-                {'far-field'},...
-                {'outlet'},...
-                {'wall'}};
-BC_setup.vals = {{{1,1,0}},...
-        {{1,1,0}},...
-        {{0,0,0}},...
-        {{0,0,dyBdx}}};
-    
-BC_setup.ranges = { {[0 15]},...
-                    {[-5    10]},...
-                    {[0 15]},...
-                    {[-5    10]}};
+BC_setup = {'W',        'E',        'N',            'S';...
+            'inlet',    'outlet',   'far-field',    'wall';...
+            1,          0,          1,              0;...
+            1,          0,          1,              0;...
+            0,          0,          0,              dyBdx};
         
 test = eulerIsentropicField(CT, grid_lims(:,:,1), FL, BC_setup);
 tic;
@@ -90,4 +77,11 @@ end
 % cd([pwd '\' geomName '\' folderName]);
 test.post_process(dirName);
 
-copyfile('woodward_test.m',[dirName '\case_setup.m']);
+copyfile('biconvex_test.m',[dirName '\case_setup.m']);
+
+% cd('../../');
+
+% XX = cat(1, test(1).GR.XX, test(2).GR.XX);
+% YY = cat(1, test(1).GR.YY, test(2).GR.YY);
+% UU = cat(1, test(1).FV(1).fv(:,:,2,3) ./ test(1).FV(1).fv(:,:,1,3), test(2).FV(1).fv(:,:,2,3) ./ test(2).FV(1).fv(:,:,1,3));
+% figure();contourf(XX, YY, UU, 50);

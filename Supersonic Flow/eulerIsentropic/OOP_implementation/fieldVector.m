@@ -171,22 +171,24 @@ classdef fieldVector
             
             % Parse variable inputs for time and element indexing
             % information
-            if strcmpi(DIR, 'W') && strcmpi(DIR, 'E')
-                rMin = ones(size(obj.gr.d1vals));
-                rMax = ones(size(obj.gr.d1vals));
-            elseif strcmpi(DIR, 'S') && strcmpi(DIR, 'N')
-                rMin = ones(size(obj.gr.d2vals));
-                rMax = ones(size(obj.gr.d2vals));
+            if strcmpi(DIR, 'W') || strcmpi(DIR, 'E')
+                nodes = obj.gr.d1vals;
+            elseif strcmpi(DIR, 'S') || strcmpi(DIR, 'N')
+                nodes = obj.gr.d2vals;
             end
             if ~isempty(varargin)
                 if ~isempty(varargin{1})
-                    rMin = obj.gr.d1vals > varargin{1};
+                    rMin = nodes > varargin{1};
+                else
+                    rMin = ones(size(nodes));
                 end
                 if ~isempty(varargin{2})
-                    rMax = obj.gr.d1vals < varargin{2};
+                    rMax = nodes < varargin{2};
+                else
+                    rMax = one(size(nodes));
                 end
                 
-                if ~isempty(varargin{3}) && (varargin{3} == 'p')
+                if length(varargin) > 2
                     depth = 2;
                 else
                     depth = 1;
@@ -227,7 +229,7 @@ classdef fieldVector
             % direction
             output = obj.bc.(DIR)(bcIdx).val;
             
-            if ~isempty(varargin{1})
+            if ~isempty(varargin)
                 output = output{varargin{1}};
             end
             
@@ -295,13 +297,13 @@ classdef fieldVector
             
         end
         
-        function BC_vals = gen_symBC(obj, FF, dir, num_types)
+        function BC_vals = gen_symBC(obj, FF, DIR, num_types)
             BC_vals = [];
             for ii = 1:size(FF,3) % loop through vector "elements"
                 % symmetry will likely appear right on the
                 % boundary of the grid... maybe need to
                 % account for displaced symmetry?? 
-                switch dir
+                switch DIR
                     case 'W'
                         if strcmp(num_types{ii}, 'N')
                             BC_vals = cat(3, BC_vals, (FF(:,1,ii) - FF(:,2,ii))./obj.gr.d2);
@@ -335,10 +337,10 @@ classdef fieldVector
             
         end
         
-        function BC_vals = gen_regBC(obj, FF, dir, num_types, vals)
+        function BC_vals = gen_regBC(obj, FF, DIR, num_types, vals)
             BC_vals = [];
             for ii = 1:size(obj.fv, 3)
-                switch dir
+                switch DIR
                     case 'W'
                         if isscalar(vals{ii})
                             temp_BC = vals{ii}.*ones(size(FF,1),1);
@@ -411,10 +413,10 @@ classdef fieldVector
            end
         end
         
-        function BC_vals = gen_wallBC(obj, FF, dir, num_types, vals)
+        function BC_vals = gen_wallBC(obj, FF, DIR, num_types, vals)
             BC_vals = [];
             for ii = 1:size(obj.fv, 3)
-                switch dir
+                switch DIR
                     case 'W'
                         if isscalar(vals{ii})
                             temp_BC = vals{ii}.*ones(size(FF,1),1);

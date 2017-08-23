@@ -19,7 +19,7 @@ classdef eulerIsentropicField < handle
         
         % Field Vectors
         FV
-        PP % pressure values derived from density
+        PP
         
     end
     
@@ -103,11 +103,11 @@ classdef eulerIsentropicField < handle
 
                     for ii = 1:n_types % loop through types at each direction
                         % default properties
-                        obj.BC(vec).(dir{i})(ii).update{ii} = 0;
+                        obj.BC(vec).(dir{i})(ii).update = 0;
                         obj.BC(vec).(dir{i})(ii).physical = phys_types{i}{ii};
-                        if (isempty(range)|| isempty(range{i})) && (n_types == 1) % assumes that there is only one BC at each direction
+                        if (isempty(range)|| isempty(range{i})) % assumes that there is only one BC at each direction
                             obj.BC(vec).(dir{i})(ii).range = {};
-                        elseif (n_types > 1)
+                        elseif (n_types >= 1)
                             obj.BC(vec).(dir{i})(ii).range = range{i}{ii};
                         else
                             error('Please enter ranges!\n');
@@ -124,7 +124,7 @@ classdef eulerIsentropicField < handle
                                 end
 
                                 % check if wall is zero or a linearized BC
-                                obj.BC(vec).(dir{i})(ii).update{ii} = ~all(vals{i}{ii}{wall_vec} == 0);
+                                obj.BC(vec).(dir{i})(ii).update = ~all(vals{i}{ii}{wall_vec} == 0);
 
                                 if vec == wall_vec
                                     obj.BC(vec).(dir{i})(ii).numerical = repmat({'D'}, 1, length(vals{1}{1}));
@@ -177,7 +177,7 @@ classdef eulerIsentropicField < handle
                                 obj.BC(vec).(dir{i})(ii).numerical{sym_vec} = 'D';
 
                             case 'patch'
-                                obj.BC(vec).(dir{i})(ii).update{ii} = 1;
+                                obj.BC(vec).(dir{i})(ii).update = 1;
                                 obj.BC(vec).(dir{i})(ii).numerical = repmat({'D'}, 1, length(vals{1}{1}));
                                 obj.BC(vec).(dir{i})(ii).val = vals{i}{ii}; % initial values given assumed to be similar to initial condition values
 
@@ -219,8 +219,8 @@ classdef eulerIsentropicField < handle
                 end
             end
             
-%             obj.PP = fieldScalar(obj.GR, obj.BC(4), obj.CT, PP_fv);
-            obj.FV(i) = fieldVector(obj.GR, obj.BC(i), obj.CT, 0, {PP_fv});
+%             obj.PP1 = fieldScalar(obj.GR, obj.BC(4), obj.CT, PP_fv);
+            obj.PP = fieldVector(obj.GR, obj.BC(4), obj.CT, 0, {PP_fv});
         end
     end
     
@@ -313,7 +313,7 @@ classdef eulerIsentropicField < handle
                 end                
             end
             
-            obj.PP = obj.PP.update_fv(obj.FV(1).fv(:,:,1,2) .^ obj.FL.gam ./ (obj.FL.gam .* obj.FL.M0^2));
+            obj.PP = obj.PP.update_fv({obj.FV(1).fv(:,:,1,2) .^ obj.FL.gam ./ (obj.FL.gam .* obj.FL.M0^2)});
             
         end
         
@@ -332,7 +332,7 @@ classdef eulerIsentropicField < handle
                                 obj = obj.updateWallBC(fnames{i}, bcIdx);
 
                             case 'patch'
-                                obj = obj.updatePatchBC(others, DIR, bcIdx);                          
+                                obj = obj.updatePatchBC(others, fnames{i}, bcIdx);                          
                         end
                     end
                 end
@@ -344,24 +344,32 @@ classdef eulerIsentropicField < handle
             % then apply to other vectors
             
             % get old density
-            d0 = obj.FV(1).get_boundVal(DIR, 1,1, obj.BC(1).dir(bcIdx).range(1), obj.BC(1).dir(bcIdx).range(2)); % t1
+            if ~isempty(obj.BC(1).(DIR)(bcIdx).range)
+                d0 = obj.FV(1).get_boundVal(DIR, 1,1, obj.BC(1).(DIR)(bcIdx).range(1), obj.BC(1).(DIR)(bcIdx).range(2)); % t1
+            else
+                d0 = obj.FV(1).get_boundVal(DIR, 1,1);
+            end
 
             % get wall normal velocity for updating
             wall_loc = strcmpi(obj.BC(1).(DIR)(bcIdx).numerical, 'D');
             wall_dir = find(wall_loc);
             for vec = 1:length(obj.FV)
                 update_vals = [];
-                update_cell = cell(1,length(obj.FV));    
+                update_cell = cell(1,length(obj.FV)); 
+                
+                if ~isempty(obj.BC(1).(DIR)(bcIdx).range)
+                    BC_val = obj.FV(1).get_boundVal(DIR,[],vec, obj.BC(1).(DIR)(bcIdx).range(1), obj.BC(1).(DIR)(bcIdx).range(2));
+                else
+                    BC_val = obj.FV(1).get_boundVal(DIR,[],vec);
+                end
                 
                 if vec ~= wall_dir
                     % update for element direction that is normal to the wall
-                    update_vals = obj.FV(1).get_boundVal(DIR,[],vec, obj.BC(1).dir(bcIdx).range(1), obj.BC(1).dir(bcIdx).range(2))...
-                                .*obj.FV(1).get_boundCondVal(DIR, bcIdx, wall_dir)./d0; 
+                    update_vals = BC_val.*obj.FV(1).get_boundCondVal(DIR, bcIdx, wall_dir)./d0; 
                     update_cell{wall_dir} = update_vals; % if not at normal vel, just need to update the one dirichlet boundary
                 else
                     % we are at the vector that corresponds to normal wall vel
-                    update_vals = obj.FV(1).get_boundVal(DIR,[],[],obj.BC(1).dir(bcIdx).range(1), obj.BC(1).dir(bcIdx).range(2))...
-                                .*repmat(obj.FV(1).get_boundCondVal(DIR, bcIdx, wall_dir)./d0, 1,1,size(obj.FV(1).fv,3)); 
+                    update_vals = BC_val.*repmat(obj.FV(1).get_boundCondVal(DIR, bcIdx, wall_dir)./d0, 1,1,size(obj.FV(1).fv,3)); 
                     update_cell = mat2cell(update_vals, size(update_vals,1), size(update_vals,2), ones(1,size(update_vals,3)));
                 end
                 
@@ -530,56 +538,56 @@ classdef eulerIsentropicField < handle
 %             saveas(gcf, [DIR '\cp_surf']);
             
             %% contour plots
-            XX1 = cat(1, (obj(1).GR.XX), (obj(2).GR.XX));
-            XX2 = cat(2, (obj(2).GR.XX(:,end)), (obj(3).GR.XX));
-            YY1 = cat(1, (obj(1).GR.YY), (obj(2).GR.YY));
-            YY2 = cat(2, (obj(2).GR.YY(:,end)), (obj(3).GR.YY));
-            
-            RHO1 = cat(1, (obj(1).FV(1).fv(:,:,1,3)), (obj(2).FV(1).fv(:,:,1,3)));
-            RHO2 = cat(2, (obj(2).FV(1).fv(:,end,1,3)), (obj(3).FV(1).fv(:,:,1,3)));
-            Ux1 = cat(1, (obj(1).FV(1).fv(:,:,2,3) ./ obj(1).FV(1).fv(:,:,1,3)), (obj(2).FV(1).fv(:,:,2,3) ./ obj(2).FV(1).fv(:,:,1,3)));
-            Vy1 = cat(1, (obj(1).FV(1).fv(:,:,3,3) ./ obj(1).FV(1).fv(:,:,1,3)), (obj(2).FV(1).fv(:,:,3,3) ./ obj(2).FV(1).fv(:,:,1,3)));
-            Ux2 = cat(2, (obj(2).FV(1).fv(:,end,2,3) ./ obj(2).FV(1).fv(:,end,1,3)), (obj(3).FV(1).fv(:,:,2,3) ./ obj(3).FV(1).fv(:,:,1,3)));
-            Vy2 = cat(2, (obj(2).FV(1).fv(:,end,3,3) ./ obj(2).FV(1).fv(:,end,1,3)), (obj(3).FV(1).fv(:,:,3,3) ./ obj(3).FV(1).fv(:,:,1,3)));
-            P1 = cat(1, (obj(1).PP.fv), (obj(2).PP.fv));
-            P2 = cat(2, (obj(2).PP.fv(:,end)), (obj(3).PP.fv));
-            
-            q2_ij1 = (Ux1).^2 + (Vy1).^2;
-            q2_ij2 = (Ux2).^2 + (Vy2).^2;
-
-            % plot density
-%             for i = 1:length(obj)
-%                 Ux = (obj(i).FV(1).fv(:,:,2,3) ./ obj(i).FV(1).fv(:,:,1,3));
-%                 Vy = (obj(i).FV(1).fv(:,:,3,3) ./ obj(i).FV(1).fv(:,:,1,3));
-% 
-%                 q2_ij = (Ux).^2 + (Vy).^2;
-%                 figure(3);
-%                 hold on;
-%                 contourf(obj(i).GR.XX,obj(i).GR.YY,round(obj(i).FV(1).fv(:,:,1,2),3), 50)
-%                 
-% 
-%                 figure(4); % cp plots
-%                 hold on;
-%                 contourf(obj(i).GR.XX, obj(i).GR.YY, 1-q2_ij, 50); %./((RR.*cos(TT)).^2)
-% 
-%                 figure(5); % pressure
-%                 hold on;
-%                 contourf(obj(i).GR.XX, obj(i).GR.YY, obj(i).PP.fv, 50);
-% 
-%                 figure(6); % theta-dir velocity plots
-%                 hold on;
-%                 contourf(obj(i).GR.XX, obj(i).GR.YY, Ux, 50); %./((RR.*cos(TT)).^2)
-%                 
-% 
-%                 figure(7); % theta-dir velocity plots
-%                 hold on;
-%                 contourf(obj(i).GR.XX, obj(i).GR.YY, Vy, 50); %./((RR.*cos(TT)).^2)
+%             XX1 = cat(1, (obj(1).GR.XX), (obj(2).GR.XX));
+%             XX2 = cat(2, (obj(2).GR.XX(:,end)), (obj(3).GR.XX));
+%             YY1 = cat(1, (obj(1).GR.YY), (obj(2).GR.YY));
+%             YY2 = cat(2, (obj(2).GR.YY(:,end)), (obj(3).GR.YY));
 %             
-%             end
+%             RHO1 = cat(1, (obj(1).FV(1).fv(:,:,1,3)), (obj(2).FV(1).fv(:,:,1,3)));
+%             RHO2 = cat(2, (obj(2).FV(1).fv(:,end,1,3)), (obj(3).FV(1).fv(:,:,1,3)));
+%             Ux1 = cat(1, (obj(1).FV(1).fv(:,:,2,3) ./ obj(1).FV(1).fv(:,:,1,3)), (obj(2).FV(1).fv(:,:,2,3) ./ obj(2).FV(1).fv(:,:,1,3)));
+%             Vy1 = cat(1, (obj(1).FV(1).fv(:,:,3,3) ./ obj(1).FV(1).fv(:,:,1,3)), (obj(2).FV(1).fv(:,:,3,3) ./ obj(2).FV(1).fv(:,:,1,3)));
+%             Ux2 = cat(2, (obj(2).FV(1).fv(:,end,2,3) ./ obj(2).FV(1).fv(:,end,1,3)), (obj(3).FV(1).fv(:,:,2,3) ./ obj(3).FV(1).fv(:,:,1,3)));
+%             Vy2 = cat(2, (obj(2).FV(1).fv(:,end,3,3) ./ obj(2).FV(1).fv(:,end,1,3)), (obj(3).FV(1).fv(:,:,3,3) ./ obj(3).FV(1).fv(:,:,1,3)));
+%             P1 = cat(1, (obj(1).PP.fv), (obj(2).PP.fv));
+%             P2 = cat(2, (obj(2).PP.fv(:,end)), (obj(3).PP.fv));
+%             
+%             q2_ij1 = (Ux1).^2 + (Vy1).^2;
+%             q2_ij2 = (Ux2).^2 + (Vy2).^2;
+
+%             plot density
+            for i = 1:length(obj)
+                Ux = (obj(i).FV(1).fv(:,:,2,3) ./ obj(i).FV(1).fv(:,:,1,3));
+                Vy = (obj(i).FV(1).fv(:,:,3,3) ./ obj(i).FV(1).fv(:,:,1,3));
+
+                q2_ij = (Ux).^2 + (Vy).^2;
+                figure(3);
+                hold on;
+                contourf(obj(i).GR.XX,obj(i).GR.YY,round(obj(i).FV(1).fv(:,:,1,2),3), 50)
+                
+
+                figure(4); % cp plots
+                hold on;
+                contourf(obj(i).GR.XX, obj(i).GR.YY, 1-q2_ij, 50); %./((RR.*cos(TT)).^2)
+
+                figure(5); % pressure
+                hold on;
+                contourf(obj(i).GR.XX, obj(i).GR.YY, obj(i).PP.fv, 50);
+
+                figure(6); % theta-dir velocity plots
+                hold on;
+                contourf(obj(i).GR.XX, obj(i).GR.YY, Ux, 50); %./((RR.*cos(TT)).^2)
+                
+
+                figure(7); % theta-dir velocity plots
+                hold on;
+                contourf(obj(i).GR.XX, obj(i).GR.YY, Vy, 50); %./((RR.*cos(TT)).^2)
+            
+            end
             
             figure(3);
-            contourf(XX1, YY1, RHO1, 50);hold on;
-            contourf(XX2, YY2, RHO2, 50);
+%             contourf(XX1, YY1, RHO1, 50);hold on;
+%             contourf(XX2, YY2, RHO2, 50);
             title(['Density (Normalized), M=' num2str(obj(i).FL.M0)]);
             colorbar('eastoutside');
             axis equal
@@ -587,8 +595,8 @@ classdef eulerIsentropicField < handle
             saveas(gcf, [DIR '\density']);
             
             figure(4);
-            contourf(XX1, YY1, q2_ij1, 50);hold on;
-            contourf(XX2, YY2, q2_ij2, 50);
+%             contourf(XX1, YY1, q2_ij1, 50);hold on;
+%             contourf(XX2, YY2, q2_ij2, 50);
             title(['Pressure Coefficient Contours, M=' num2str(obj(i).FL.M0)]);
             colorbar('eastoutside');
             axis equal
@@ -596,8 +604,8 @@ classdef eulerIsentropicField < handle
             saveas(gcf, [DIR '\cp_contour']);
             
             figure(5);
-            contourf(XX1, YY1, P1, 50);hold on;
-            contourf(XX2, YY2, P2, 50);
+%             contourf(XX1, YY1, P1, 50);hold on;
+%             contourf(XX2, YY2, P2, 50);
             title(['Pressure (Normalized), M=' num2str(obj(i).FL.M0)]);
             colorbar('eastoutside');
             axis equal
@@ -605,8 +613,8 @@ classdef eulerIsentropicField < handle
             saveas(gcf, [DIR '\pressure']);
             
             figure(6);
-            contourf(XX1, YY1, Ux1, 50);hold on;
-            contourf(XX2, YY2, Ux2, 50);
+%             contourf(XX1, YY1, Ux1, 50);hold on;
+%             contourf(XX2, YY2, Ux2, 50);
             title(['U velocity, M=' num2str(obj(i).FL.M0)]);
             colorbar('eastoutside');
             axis equal
@@ -614,8 +622,8 @@ classdef eulerIsentropicField < handle
             saveas(gcf, [DIR '\phi_theta']);
             
             figure(7);
-            contourf(XX1, YY1, Vy1, 50);hold on;
-            contourf(XX2, YY2, Vy2, 50);
+%             contourf(XX1, YY1, Vy1, 50);hold on;
+%             contourf(XX2, YY2, Vy2, 50);
             title(['V velocity, M=' num2str(obj(i).FL.M0)]);
             colorbar('eastoutside');
             axis equal
