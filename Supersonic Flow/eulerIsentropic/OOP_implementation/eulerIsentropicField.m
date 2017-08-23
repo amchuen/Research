@@ -496,65 +496,73 @@ classdef eulerIsentropicField < handle
 %              figure(2);
 %             % plot([fliplr(XX(:,end)'), XX(1,:)], 1 - [fliplr(q2_ij(:,end)'), q2_ij(1,:)]);
 %             plot(obj(1).GR.XX(1,:), 1-q2_ij(1,:));
-%             xlabel('X');
-%             %     ylabel('\phi_{\theta}');
-%             ylabel('C_p');
-%             title(['C_p on surface, M=' num2str(obj.FL.M0)]);
-%             set(gca, 'Ydir', 'reverse');
-%             saveas(gcf, [DIR '\cp_surf.pdf']);
-%             saveas(gcf, [DIR '\cp_surf']);
             
             %% contour plots
-            XX1 = cat(1, (obj(1).GR.XX), (obj(2).GR.XX));
-            XX2 = cat(2, (obj(2).GR.XX(:,end)), (obj(3).GR.XX));
-            YY1 = cat(1, (obj(1).GR.YY), (obj(2).GR.YY));
-            YY2 = cat(2, (obj(2).GR.YY(:,end)), (obj(3).GR.YY));
-            
-            RHO1 = cat(1, (obj(1).FV(1).fv(:,:,1,3)), (obj(2).FV(1).fv(:,:,1,3)));
-            RHO2 = cat(2, (obj(2).FV(1).fv(:,end,1,3)), (obj(3).FV(1).fv(:,:,1,3)));
-            Ux1 = cat(1, (obj(1).FV(1).fv(:,:,2,3) ./ obj(1).FV(1).fv(:,:,1,3)), (obj(2).FV(1).fv(:,:,2,3) ./ obj(2).FV(1).fv(:,:,1,3)));
-            Vy1 = cat(1, (obj(1).FV(1).fv(:,:,3,3) ./ obj(1).FV(1).fv(:,:,1,3)), (obj(2).FV(1).fv(:,:,3,3) ./ obj(2).FV(1).fv(:,:,1,3)));
-            Ux2 = cat(2, (obj(2).FV(1).fv(:,end,2,3) ./ obj(2).FV(1).fv(:,end,1,3)), (obj(3).FV(1).fv(:,:,2,3) ./ obj(3).FV(1).fv(:,:,1,3)));
-            Vy2 = cat(2, (obj(2).FV(1).fv(:,end,3,3) ./ obj(2).FV(1).fv(:,end,1,3)), (obj(3).FV(1).fv(:,:,3,3) ./ obj(3).FV(1).fv(:,:,1,3)));
-            P1 = cat(1, (obj(1).PP.fv), (obj(2).PP.fv));
-            P2 = cat(2, (obj(2).PP.fv(:,end)), (obj(3).PP.fv));
-            
-            q2_ij1 = (Ux1).^2 + (Vy1).^2;
-            q2_ij2 = (Ux2).^2 + (Vy2).^2;
-
-            % plot density
-%             for i = 1:length(obj)
-%                 Ux = (obj(i).FV(1).fv(:,:,2,3) ./ obj(i).FV(1).fv(:,:,1,3));
-%                 Vy = (obj(i).FV(1).fv(:,:,3,3) ./ obj(i).FV(1).fv(:,:,1,3));
-% 
-%                 q2_ij = (Ux).^2 + (Vy).^2;
-%                 figure(3);
-%                 hold on;
-%                 contourf(obj(i).GR.XX,obj(i).GR.YY,round(obj(i).FV(1).fv(:,:,1,2),3), 50)
-%                 
-% 
-%                 figure(4); % cp plots
-%                 hold on;
-%                 contourf(obj(i).GR.XX, obj(i).GR.YY, 1-q2_ij, 50); %./((RR.*cos(TT)).^2)
-% 
-%                 figure(5); % pressure
-%                 hold on;
-%                 contourf(obj(i).GR.XX, obj(i).GR.YY, obj(i).PP.fv, 50);
-% 
-%                 figure(6); % theta-dir velocity plots
-%                 hold on;
-%                 contourf(obj(i).GR.XX, obj(i).GR.YY, Ux, 50); %./((RR.*cos(TT)).^2)
-%                 
-% 
-%                 figure(7); % theta-dir velocity plots
-%                 hold on;
-%                 contourf(obj(i).GR.XX, obj(i).GR.YY, Vy, 50); %./((RR.*cos(TT)).^2)
+%             XX1 = cat(1, (obj(1).GR.XX), (obj(2).GR.XX));
+%             XX2 = cat(2, (obj(2).GR.XX(:,end)), (obj(3).GR.XX));
+%             YY1 = cat(1, (obj(1).GR.YY), (obj(2).GR.YY));
+%             YY2 = cat(2, (obj(2).GR.YY(:,end)), (obj(3).GR.YY));
 %             
-%             end
+%             RHO1 = cat(1, (obj(1).FV(1).fv(:,:,1,3)), (obj(2).FV(1).fv(:,:,1,3)));
+%             RHO2 = cat(2, (obj(2).FV(1).fv(:,end,1,3)), (obj(3).FV(1).fv(:,:,1,3)));
+%             Ux1 = cat(1, (obj(1).FV(1).fv(:,:,2,3) ./ obj(1).FV(1).fv(:,:,1,3)), (obj(2).FV(1).fv(:,:,2,3) ./ obj(2).FV(1).fv(:,:,1,3)));
+%             Vy1 = cat(1, (obj(1).FV(1).fv(:,:,3,3) ./ obj(1).FV(1).fv(:,:,1,3)), (obj(2).FV(1).fv(:,:,3,3) ./ obj(2).FV(1).fv(:,:,1,3)));
+%             Ux2 = cat(2, (obj(2).FV(1).fv(:,end,2,3) ./ obj(2).FV(1).fv(:,end,1,3)), (obj(3).FV(1).fv(:,:,2,3) ./ obj(3).FV(1).fv(:,:,1,3)));
+%             Vy2 = cat(2, (obj(2).FV(1).fv(:,end,3,3) ./ obj(2).FV(1).fv(:,end,1,3)), (obj(3).FV(1).fv(:,:,3,3) ./ obj(3).FV(1).fv(:,:,1,3)));
+%             P1 = cat(1, (obj(1).PP.fv), (obj(2).PP.fv));
+%             P2 = cat(2, (obj(2).PP.fv(:,end)), (obj(3).PP.fv));
+%             
+%             q2_ij1 = (Ux1).^2 + (Vy1).^2;
+%             q2_ij2 = (Ux2).^2 + (Vy2).^2;
+
+%             plot density
+            for i = 1:length(obj)
+                Ux = (obj(i).FV(1).fv(:,:,2,3) ./ obj(i).FV(1).fv(:,:,1,3));
+                Vy = (obj(i).FV(1).fv(:,:,3,3) ./ obj(i).FV(1).fv(:,:,1,3));
+
+                q2_ij = (Ux).^2 + (Vy).^2;
+                
+                figure(2);
+                % plot([fliplr(XX(:,end)'), XX(1,:)], 1 - [fliplr(q2_ij(:,end)'), q2_ij(1,:)]);
+                plot(obj(1).GR.XX(1,:), 1-q2_ij(1,:));
+                hold on;
+                
+                figure(3);
+                hold on;
+                contourf(obj(i).GR.XX,obj(i).GR.YY,round(obj(i).FV(1).fv(:,:,1,2),3), 50)
+                
+
+                figure(4); % cp plots
+                hold on;
+                contourf(obj(i).GR.XX, obj(i).GR.YY, 1-q2_ij, 50); %./((RR.*cos(TT)).^2)
+
+                figure(5); % pressure
+                hold on;
+                contourf(obj(i).GR.XX, obj(i).GR.YY, obj(i).PP.fv, 50);
+
+                figure(6); % theta-dir velocity plots
+                hold on;
+                contourf(obj(i).GR.XX, obj(i).GR.YY, Ux, 50); %./((RR.*cos(TT)).^2)
+                
+
+                figure(7); % theta-dir velocity plots
+                hold on;
+                contourf(obj(i).GR.XX, obj(i).GR.YY, Vy, 50); %./((RR.*cos(TT)).^2)
+            
+            end
+            
+            figure(2);
+            xlabel('X');
+            %     ylabel('\phi_{\theta}');
+            ylabel('C_p');
+            title(['C_p on surface, M=' num2str(obj.FL.M0)]);
+            set(gca, 'Ydir', 'reverse');
+            saveas(gcf, [DIR '\cp_surf.pdf']);
+            saveas(gcf, [DIR '\cp_surf']);
             
             figure(3);
-            contourf(XX1, YY1, RHO1, 50);hold on;
-            contourf(XX2, YY2, RHO2, 50);
+%             contourf(XX1, YY1, RHO1, 50);hold on;
+%             contourf(XX2, YY2, RHO2, 50);
             title(['Density (Normalized), M=' num2str(obj(i).FL.M0)]);
             colorbar('eastoutside');
             axis equal
@@ -562,8 +570,8 @@ classdef eulerIsentropicField < handle
             saveas(gcf, [DIR '\density']);
             
             figure(4);
-            contourf(XX1, YY1, q2_ij1, 50);hold on;
-            contourf(XX2, YY2, q2_ij2, 50);
+%             contourf(XX1, YY1, q2_ij1, 50);hold on;
+%             contourf(XX2, YY2, q2_ij2, 50);
             title(['Pressure Coefficient Contours, M=' num2str(obj(i).FL.M0)]);
             colorbar('eastoutside');
             axis equal
@@ -571,8 +579,8 @@ classdef eulerIsentropicField < handle
             saveas(gcf, [DIR '\cp_contour']);
             
             figure(5);
-            contourf(XX1, YY1, P1, 50);hold on;
-            contourf(XX2, YY2, P2, 50);
+%             contourf(XX1, YY1, P1, 50);hold on;
+%             contourf(XX2, YY2, P2, 50);
             title(['Pressure (Normalized), M=' num2str(obj(i).FL.M0)]);
             colorbar('eastoutside');
             axis equal
@@ -580,8 +588,8 @@ classdef eulerIsentropicField < handle
             saveas(gcf, [DIR '\pressure']);
             
             figure(6);
-            contourf(XX1, YY1, Ux1, 50);hold on;
-            contourf(XX2, YY2, Ux2, 50);
+%             contourf(XX1, YY1, Ux1, 50);hold on;
+%             contourf(XX2, YY2, Ux2, 50);
             title(['U velocity, M=' num2str(obj(i).FL.M0)]);
             colorbar('eastoutside');
             axis equal
@@ -589,8 +597,8 @@ classdef eulerIsentropicField < handle
             saveas(gcf, [DIR '\phi_theta']);
             
             figure(7);
-            contourf(XX1, YY1, Vy1, 50);hold on;
-            contourf(XX2, YY2, Vy2, 50);
+%             contourf(XX1, YY1, Vy1, 50);hold on;
+%             contourf(XX2, YY2, Vy2, 50);
             title(['V velocity, M=' num2str(obj(i).FL.M0)]);
             colorbar('eastoutside');
             axis equal
