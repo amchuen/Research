@@ -10,14 +10,8 @@ dx = 0.05;
 dy = 0.08;
 
 % Field Axis Values - body fitted grid
-grid_lims = [   0+0.5*dy,  15.0-0.5*dy, dy; % y-range
-                -5+(0.5*dx), 10-(0.5.*dx),    dx];... 
-
-grid_lims(:,:,2) = [    0.2+0.5.*dy-mod(0.2,dy),  1.0, dy; % y-range
-                        0.0+(0.5*dx), 0.6-(0.5.*dx),    dx];... 
-                        
-grid_lims(:,:,3) = [    0.2+0.5.*dy-mod(0.2,dy),  1.0, dy;
-                        0.6+(0.5.*dx)-mod(0.6,dx), 3.0, dx];
+grid_lims = [   0,  15.0, dy; % y-range
+                -5, 10,    dx];... 
 
 %% Airfoil Geometry
 
@@ -33,7 +27,7 @@ for i = 2:(length(YY_B)-1)
 end
 
 %% CTRL
-CT.eps_s = 0.1; %0.07525; % spatial diffusion term
+CT.eps_s = 0.07525; % spatial diffusion term
 CT.eps_t = 0.013;  % time diffusion term
 CT.tol = 1e-6;
 CT.dt = 0.1;
@@ -58,10 +52,10 @@ BC_setup.vals = {{{1,1,0}},...
         {{0,0,0}},...
         {{0,0,dyBdx}}};
     
-BC_setup.ranges = { {[0 15]},...
-                    {[-5    10]},...
-                    {[0 15]},...
-                    {[-5    10]}};
+BC_setup.ranges = { {},...
+                    {},...
+                    {},...
+                    {}};
         
 test = eulerIsentropicField(CT, grid_lims(:,:,1), FL, BC_setup);
 tic;

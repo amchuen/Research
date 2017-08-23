@@ -219,8 +219,8 @@ classdef eulerIsentropicField < handle
                 end
             end
             
-%             obj.PP1 = fieldScalar(obj.GR, obj.BC(4), obj.CT, PP_fv);
-            obj.PP = fieldVector(obj.GR, obj.BC(4), obj.CT, 0, {PP_fv});
+            obj.PP = fieldScalar(obj.GR, obj.BC(4), obj.CT, PP_fv);
+%             obj.PP = fieldVector(obj.GR, obj.BC(4), obj.CT, 0, {PP_fv});
         end
     end
     
@@ -317,11 +317,14 @@ classdef eulerIsentropicField < handle
             
         end
         
-        function obj = updateBC_tl(obj, others)
+        function obj = updateBC_tl(obj, varargin)
             % NOTES:
             % - this function is run after field values have been updated
             % - densities should always initialized with 1!
             
+            if ~isempty(varargin)
+               others = varargin{1}; 
+            end
             fnames = fieldnames(obj.BC);
             for i = 1:length(fnames) % loop through each direction
                 for bcIdx = 1:length(obj.BC(1).(fnames{i})) % loop through mixed types if more than one!
@@ -358,18 +361,18 @@ classdef eulerIsentropicField < handle
                 update_cell = cell(1,length(obj.FV)); 
                 
                 if ~isempty(obj.BC(1).(DIR)(bcIdx).range)
-                    BC_val = obj.FV(1).get_boundVal(DIR,[],vec, obj.BC(1).(DIR)(bcIdx).range(1), obj.BC(1).(DIR)(bcIdx).range(2));
+                    E_BC = obj.FV(1).get_boundVal(DIR,[],[], obj.BC(1).(DIR)(bcIdx).range(1), obj.BC(1).(DIR)(bcIdx).range(2));
                 else
-                    BC_val = obj.FV(1).get_boundVal(DIR,[],vec);
+                    E_BC = obj.FV(1).get_boundVal(DIR,[],[]);
                 end
                 
                 if vec ~= wall_dir
                     % update for element direction that is normal to the wall
-                    update_vals = BC_val.*obj.FV(1).get_boundCondVal(DIR, bcIdx, wall_dir)./d0; 
+                    update_vals = E_BC(:,:,vec).*obj.FV(1).get_boundCondVal(DIR, bcIdx, wall_dir)./d0; 
                     update_cell{wall_dir} = update_vals; % if not at normal vel, just need to update the one dirichlet boundary
                 else
                     % we are at the vector that corresponds to normal wall vel
-                    update_vals = BC_val.*repmat(obj.FV(1).get_boundCondVal(DIR, bcIdx, wall_dir)./d0, 1,1,size(obj.FV(1).fv,3)); 
+                    update_vals = E_BC.*repmat(obj.FV(1).get_boundCondVal(DIR, bcIdx, wall_dir)./d0, 1,1,size(obj.FV(1).fv,3)); 
                     update_cell = mat2cell(update_vals, size(update_vals,1), size(update_vals,2), ones(1,size(update_vals,3)));
                 end
                 

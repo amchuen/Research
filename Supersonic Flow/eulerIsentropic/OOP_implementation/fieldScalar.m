@@ -167,7 +167,7 @@ classdef fieldScalar %< handle
         
         function obj = update_fv(obj, updateVals)
         % this function updates the field values for the fieldVector
-            obj.fv = updateVals;
+            obj.fv = updateVals{1};
             
             % re-calculate derivatives
             obj = obj.Gradient();

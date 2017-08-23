@@ -176,23 +176,26 @@ classdef fieldVector
             elseif strcmpi(DIR, 'S') || strcmpi(DIR, 'N')
                 nodes = obj.gr.d2vals;
             end
+            depth = 1;
             if ~isempty(varargin)
                 if ~isempty(varargin{1})
                     rMin = nodes > varargin{1};
-                else
-                    rMin = ones(size(nodes));
                 end
                 if ~isempty(varargin{2})
                     rMax = nodes < varargin{2};
-                else
-                    rMax = one(size(nodes));
                 end
                 
                 if length(varargin) > 2
                     depth = 2;
-                else
-                    depth = 1;
                 end
+            end
+            
+            if ~exist('rMin', 'var')
+                rMin = ones(size(nodes));
+            end
+            
+            if ~exist('rMax', 'var')
+                rMax = ones(size(nodes));
             end
             
             outIdx = find(rMin & rMax);
@@ -262,7 +265,7 @@ classdef fieldVector
                     end
                 elseif isempty(obj.bc.(DIR)(i).range) || (length(obj.bc.(DIR)) == 1)
                     FF_sub = FF;
-                    dim_idx = ones(size(node_pts));
+                    dim_idx = true(size(node_pts));
                 else
                     error('Ranges not specified!\n');
                 end
