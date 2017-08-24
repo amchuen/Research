@@ -48,7 +48,6 @@ classdef eulerIsentropicField < handle
             obj.CT.use_1visc = ctrl.use_1visc;
             obj.CT.is_polar = ctrl.is_polar;
             obj.CT.case_name = ctrl.case_name;
-            obj.CT.maxCFL = ctrl.maxCFL;
             
             % object controls
             
@@ -277,13 +276,11 @@ classdef eulerIsentropicField < handle
         end
         
         function out = checkConvergence(obj)
-%             out = zeros(size(obj));
-            whole_res = obj.getRes;
-%             for i = 1:length(obj)
-%                 out(i) = isempty(obj(i).CT.res) || ((max(obj(i).CT.res(end, :)) > obj(i).CT.tol*max(obj(i).CT.res(obj(i).CT.res<1)))|| (size(obj(i).CT.res,1) < obj(i).CT.iter_min));
-%             end
-%             out = any(out);
-            out = isempty(whole_res) || ((max(whole_res(end,:)) > obj(1).CT.tol*max(whole_res(whole_res<1)))|| (size(whole_res,1) < obj(1).CT.iter_min));
+            out = zeros(size(obj));
+            for i = 1:length(obj)
+                out(i) = isempty(obj(i).CT.res) || ((max(obj(i).CT.res(end, :)) > obj(i).CT.tol*max(obj(i).CT.res(obj(i).CT.res<1)))|| (size(obj(i).CT.res,1) < obj(i).CT.iter_min));
+            end
+            out = any(out);
         end
         
         function obj = updateVals(obj)
@@ -457,16 +454,13 @@ classdef eulerIsentropicField < handle
                 end
             end
 
-            if CFL_i >= obj(1).CT.maxCFL
+            if CFL_i >= 1.0 %&& CFL_on
                fprintf('CFL condition not met!\n');
-               
-               if obj(1).CT.CFL_on
-                   fprintf('Decreasing time steps!\n');
-                   for i = 1:length(obj)
-                        obj(i).CT.dt = obj(i).CT.dt*0.8*obj(i).CT.maxCFL / CFL_i;
-                   end
-                   fprintf('New time step:%0.5f\n', obj(1).CT.dt);
-                end
+               fprintf('Decreasing time steps!\n');
+               for i = 1:length(obj)
+                    obj(i).CT.dt = obj(i).CT.dt*0.8 / CFL_i;
+               end
+               fprintf('New time step:%0.5f\n', obj(1).CT.dt);
             end 
         end
           
@@ -490,7 +484,12 @@ classdef eulerIsentropicField < handle
             
 
             if ((size(obj(1).CT.res, 1) > 500) && (mod(size(obj(1).CT.res, 1), 2000) == 0)) || (plotTrigger)
-                whole_res = obj.getRes;
+                whole_res = [];
+                for i = 1:length(obj)
+                   whole_res = cat(3, whole_res, obj(i).CT.res); 
+                end
+                
+                whole_res = max(whole_res,[], 3);
                 
                 fprintf('Iteration Ct: %i\n', size(whole_res, 1));
                 fprintf('Current Residual: %0.5e\n', max(whole_res(end, :)));
@@ -505,7 +504,7 @@ classdef eulerIsentropicField < handle
             end
         end
         
-        function whole_res = getRes(obj)
+        function whole_res = getRes
             whole_res = [];
             for i = 1:length(obj)
                whole_res = cat(3, whole_res, obj(i).CT.res); 

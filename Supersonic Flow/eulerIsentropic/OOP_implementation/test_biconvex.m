@@ -2,20 +2,18 @@ clc;
 close all;
 clear;
 
+case_name = 'test_object';
+
 %% Define grid_lims
 
 dx = 0.05;
-dy = 0.08;
+dy = 0.05;
 
 % Field Axis Values - body fitted grid
-grid_lims = [   0+0.5*dy,  10.0-0.5*dy, dy; % y-range
-                -3+(0.5*dx), 10-(0.5.*dx),    dx];... 
-
-grid_lims(:,:,2) = [    0.2+0.5.*dy-mod(0.2,dy),  1.0, dy; % y-range
-                        0.0+(0.5*dx), 0.6-(0.5.*dx),    dx];... 
-                        
-grid_lims(:,:,3) = [    0.2+0.5.*dy-mod(0.2,dy),  1.0, dy;
-                        0.6+(0.5.*dx)-mod(0.6,dx), 3.0, dx];
+grid_lims = [   0+0.5*dy,  15.0-0.5*dy, dy; % y-range
+                -5+(0.5*dx), 10-(0.5.*dx),    dx];... 
+grid_lims(:,:,2) = [   15-0.5*dy,  25.0-0.5*dy, dy; % y-range
+                -5+(0.5*dx), 10-(0.5.*dx),    dx];...                 
 
 %% Airfoil Geometry
 
@@ -31,9 +29,9 @@ for i = 2:(length(YY_B)-1)
 end
 
 %% CTRL
-CT.eps_s = 0.001;% 0.07525; % spatial diffusion term
+CT.eps_s = 0.07525; % spatial diffusion term
 CT.eps_t = 0.013;  % time diffusion term
-CT.tol = 1e-5;
+CT.tol = 1e-6;
 CT.dt = 0.1;
 CT.iter_min = 300;
 CT.CFL_on = 1;
@@ -42,26 +40,41 @@ CT.is_polar = 0;
 CT.case_name = 'cylinder_vec_1visc';
 
 %% Fluid Params
-FL.M0 = 3.0;
+FL.M0 = 1.01;
 FL.gam = 1.4;
 
 %% Test genBC
 
 BC_setup.phys_types = {  {'inlet'},...
-                {'far-field'},...
+                {'patch'},...
                 {'outlet'},...
                 {'wall'}};
 BC_setup.vals = {{{1,1,0}},...
+        {{1,1,0}},...
         {{0,0,0}},...
-        {{0,0,0}, {}},...
         {{0,0,dyBdx}}};
     
-BC_setup.ranges = {   {[},...
-            {},...
-            {},...
-            {}};
+BC_setup.ranges = { {},...
+                    {[-5 10]},...
+                    {},...
+                    {}};
+                
+BC_setup(2).phys_types = {  {'inlet'},...
+                {'far-field'},...
+                {'outlet'},...
+                {'patch'}};
+BC_setup(2).vals = {{{1,1,0}},...
+        {{1,1,0}},...
+        {{0,0,0}},...
+        {{1,1,0}}};
+    
+BC_setup(2).ranges = { {},...
+                    {},...
+                    {},...
+                    {[-5 10]}};
         
-test = eulerIsentropicField(CT, grid_lims(:,:,1), FL, BC_setup);
+test = eulerIsentropicField(CT, grid_lims(:,:,1), FL, BC_setup(1));
+test(2) = eulerIsentropicField(CT, grid_lims(:,:,2), FL, BC_setup(2));
 tic;
 sim_time = 0;
 while test.checkConvergence
