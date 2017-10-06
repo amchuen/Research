@@ -34,7 +34,7 @@ end
 
 if is_polar
     % Get F_xx (theta direction)
-    [~, fx_f, fx_b]= grad_f(FF, 2, dx, BC, enforce);
+    [fx, fx_f, fx_b]= grad_f(FF, 2, dx, BC, enforce);
     F_xx = ((fx_f - fx_b)./dx)./(RR.^2);
 
     % Get F_yy (radial direction)
@@ -44,7 +44,7 @@ if is_polar
     F_yy = ((rr_n.*fy_f - rr_s.*fy_b)./dy)./(RR);
 else
     % Get F_xx
-    [~, fx_f, fx_b]= grad_f(FF, 2, dx, BC, enforce);
+    [fx, fx_f, fx_b]= grad_f(FF, 2, dx, BC, enforce);
     F_xx = (fx_f - fx_b)./dx;
 
     % Get F_yy

@@ -115,13 +115,13 @@ while (max(res(end, :)) > tol*max(res(:)))|| (size(res,1) < iter_min) % iterate 
     % Calculate new RHO
     [Ax, ~, ~] = grad_f(AA.fv(:,:,2), 2, dx, AA.BC, 1);
     [By, ~, ~] = grad_f(BB.fv(:,:,2), 1, dy, BB.BC, 1);
-	laplace_RHO = laplace_f(RHO, dx, dy, RHO.BC, 0);
+	laplace_RHO = laplace_f(RHO.fv(:,:,2), dx, dy, RHO.BC, 0);
     RHO.fv(:,:,3) = (eps_s.*laplace_RHO - Ax - By - (eps_t./(dt^2) - 0.5./dt).*RHO.fv(:,:,1) + 2.*eps_t.*RHO.fv(:,:,2)./(dt.^2))./(eps_t./(dt^2) + 0.5./dt);
         
     % Calculate new A
     [A2_rho_x, ~, ~] = grad_f((AA.fv(:,:,2).^2)./RHO.fv(:,:,2), 2, dx, AA.BC, 1);
     [AB_rho_y, ~, ~] = grad_f((AA.fv(:,:,2).*BB.fv(:,:,2))./RHO.fv(:,:,2), 1, dy, AB_R.BC, 1);
-    laplace_A = laplace_f(AA, dx, dy, AA.BC, 0);
+    laplace_A = laplace_f(AA.fv(:,:,2), dx, dy, AA.BC, 0);
     [P_x, ~, ~] = grad_f(PP.fv, 2, dx, PP.BC, 1);
     AA.fv(:,:,3) = (eps_s.*laplace_A - P_x - A2_rho_x - AB_rho_y - (eps_t./(dt^2) - 0.5./dt).*AA.fv(:,:,1) + 2.*eps_t.*AA.fv(:,:,2)./(dt.^2))./(eps_t./(dt^2) + 0.5./dt);
     

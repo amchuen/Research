@@ -92,12 +92,20 @@ The two-dimensional formulation gives the resulting governing equation.
 A density formulation is necessary to close the system of equations. The density can be obtained from the velocity, which is given by the isentropic Bernoulli's equations. 
 
 \begin{equation}
-\rho = \left[1 - \dfrac{\gamma - 1}{2}M_{\infty}^2\left(u^2 + v^2 - 1\right)\right]^{\frac{1}{\gamma - 1}}
+\rho = \left[1 - \dfrac{\gamma - 1}{2}M_{\infty}^2\left(u^2 + v^2 - 1\right)\right]^{\frac{1}{\gamma - 1}} \label{isenBern}
 \end{equation}
 
 \subsection{Full Potential with Momentum Equation (2 Eqn.)}
 % assumptions: compressible, irrotational, inviscid, adiabatic
-The integrated momentum equation can also be introduced into the 
+The isentropic Bernoulli equation can be reformulated to produce a two-equation system of partial differential equations. This is useful because it allows for  artificial viscosity to be introduced in the potential and density, as well as remove the non-linearity in the momentum equation.% does it really?
+
+Replacing the velocity terms with the gradient of the potential, equation \ref{isenBern} becomes:
+
+\begin{equation}
+\dfrac{\rho^{\gamma -1} -1}{\left(\gamma - 1\right)M_{\infty}} + \dfrac{1}{2}\left(\left(\nabla\Phi\right)^2 - 1\right)
+\end{equation}
+
+
 
 \subsection{Euler-Isentropic Equations (3 Eqns.)}
 % assumptions: compressible, inviscid, isentropic
