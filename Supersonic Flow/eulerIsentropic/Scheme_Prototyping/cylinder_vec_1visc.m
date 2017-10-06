@@ -3,9 +3,9 @@ close all;
 clear;
 
 %% CT - simulation control, including tolerances, viscous factor gain, etc.
-eps_s = 0.0525; % spatial diffusion term
-eps_t = 0.005; % time diffusion term
-tol = 1e-4;
+eps_s = 0.07525; % spatial diffusion term
+% eps_t = 0.005; % time diffusion term
+tol = 1e-5;
 dt = 0.1;
 iter_min = 300;
 CFL_on = 1;
@@ -15,7 +15,7 @@ case_name = 'cylinder_vec_1visc';
 
 %% FL - fluid parameters
 gam = 1.4; % heat 
-M0 = 0.53;
+M0 = 0.98;
 
 %% GR - grid information, such as the meshfield, grid spacing (dr, dT, etc.)
 
@@ -45,8 +45,8 @@ GR.XX = GR.RR .* cos(GR.TT);
 GR.YY = GR.RR .* sin(GR.TT);
 
 EE.fv = repmat(cat(3,  ones(size(GR.TT)),... % density
-            (cos(GR.TT).*(1 - (r_cyl^2)./(GR.RR.^2))),... % rho * u
-            (-(1 + (r_cyl^2)./(GR.RR.^2)).*sin(GR.TT))), 1, 1, 1, 3); % rho * v
+                    ones(size(GR.TT)),... (cos(GR.TT).*(1 - (r_cyl^2)./(GR.RR.^2))),... % rho * u
+                    ones(size(GR.TT))), 1, 1, 1, 3);...(-(1 + (r_cyl^2)./(GR.RR.^2)).*sin(GR.TT))), 1, 1, 1, 3); % rho * v
 FF.fv = cat(3,  GR.RR.*EE.fv(:,:,2,2),...   % rA
                 GR.RR.*(EE.fv(:,:,2,2).^2)./EE.fv(:,:,1,2),...  % rA^2/Rho
                 GR.RR.*EE.fv(:,:,2,2).*EE.fv(:,:,3,2)./EE.fv(:,:,1,2)); % rAB/Rho
@@ -211,6 +211,8 @@ while (max(res(end, :)) > tol*max(res(res<1)))|| (size(res,1) < iter_min) % iter
     A_err = (abs(EE.fv(:,:,2,3) - EE.fv(:,:,2,2)));
     B_err = (abs(EE.fv(:,:,3,3) - EE.fv(:,:,3,2)));
     
+    test = abs(EE.fv(:,:,:,3) - EE.fv(:,:,:,2));
+    
     if (size(res,1) == 1) && all(res(end,:) == 0)
         res(1, :) = [max(R_err(:)), max(A_err(:)), max(B_err(:))]; 
     else
@@ -234,9 +236,14 @@ end
 
 %% Post Process
 
-rho = EE.fv(:,:,1,2);
-aa = EE.fv(:,:,2,2);
-bb = EE.fv(:,:,3,2);
+round_level = 6;
+
+rho = round(EE.fv(:,:,1,2), round_level);
+aa = round(EE.fv(:,:,2,2), round_level);
+bb = round(EE.fv(:,:,3,2), round_level);
+pressure = round(PP.fv, round_level);
+
+levels = 50;
 
 Ur = (aa./rho);
 VT = (bb./rho);
@@ -267,7 +274,7 @@ saveas(gcf, [dirName '\residual_plot.pdf']);
 saveas(gcf, [dirName '\residual_plot']);
 
 % plot density
-figure();contourf(GR.XX,GR.YY,rho, 50)
+figure();contourf(GR.XX,GR.YY,rho, levels)
 title(['Density (Normalized), M=' num2str(M0)]);
 colorbar('eastoutside');
 axis equal
@@ -275,7 +282,7 @@ saveas(gcf, [dirName '\density.pdf']);
 saveas(gcf, [dirName '\density']);
 
 figure(); % cp plots
-contourf(GR.XX, GR.YY, 1-q2_ij, 50); %./((YY.*cos(XX)).^2)
+contourf(GR.XX, GR.YY, 1-q2_ij, levels); %./((YY.*cos(XX)).^2)
 title(['Pressure Coefficient Contours, M=' num2str(M0)]);
 colorbar('eastoutside');
 axis equal
@@ -283,7 +290,7 @@ saveas(gcf, [dirName '\cp_contour.pdf']);
 saveas(gcf, [dirName '\cp_contour']);
 
 figure(); % pressure
-contourf(GR.XX, GR.YY, PP.fv, 50);
+contourf(GR.XX, GR.YY, pressure, levels);
 title(['Pressure (Normalized), M=' num2str(M0)]);
 colorbar('eastoutside');
 axis equal
@@ -310,7 +317,7 @@ saveas(gcf, [dirName '\cp_surf.pdf']);
 saveas(gcf, [dirName '\cp_surf']);
 
 % figure(); % field potential
-% contourf(XX, YY, round(PHI(:,:,end),5), 50);
+% contourf(XX, YY, round(PHI(:,:,end),5));
 % title(['Field Potential, \Phi');
 % colorbar('eastoutside');
 % axis equal
@@ -318,21 +325,21 @@ saveas(gcf, [dirName '\cp_surf']);
 % saveas(gcf, [dirName '\phi_pot']);
 
 figure(); % theta-dir velocity plots
-contourf(GR.XX, GR.YY, Ur, 50); %./((YY.*cos(XX)).^2)
+contourf(GR.XX, GR.YY, Ur, levels); %./((YY.*cos(XX)).^2)
 title(['U velocity, M=' num2str(M0)]);
 colorbar('eastoutside');
 saveas(gcf, [dirName '\phi_theta.pdf']);
 saveas(gcf, [dirName '\phi_theta']);
 
 figure(); % theta-dir velocity plots
-contourf(GR.XX, GR.YY, VT, 50); %./((YY.*cos(XX)).^2)
+contourf(GR.XX, GR.YY, VT, levels); %./((YY.*cos(XX)).^2)
 title(['V velocity, M=' num2str(M0)]);
 colorbar('eastoutside');
 saveas(gcf, [dirName '\phi_radius.pdf']);
 saveas(gcf, [dirName '\phi_radius']);
 
 % figure();
-% contourf(XX, YY, sqrt(M2_ij), 50);
+% contourf(XX, YY, sqrt(M2_ij));
 % title(['Mach Number');
 % colorbar('eastoutside');
 % axis equal

@@ -15,6 +15,10 @@ classdef fieldVar < handle
     end
     
     methods (Abstract)
+        % All field variables should be able to do the following:
+        % Take the laplacian
+        % Take the gradient/jacobian
+        % Take the Divergence
         
         
     end
