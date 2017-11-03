@@ -28,11 +28,42 @@ r_cyl = 0.5;
 ranges = [  0,  pi;...  % theta
             r_cyl+0.5*dr,... % radius
             20];
-        
+
+GR.r_vals = ranges(2,1):dr:ranges(2,2);
+GR.T_vals = ranges(1,1):dT:ranges(1,2);
+[GR.TT, GR.RR] = meshgrid(GR.T_vals, GR.r_vals);
+GR.XX = GR.RR .* cos(GR.TT);
+GR.YY = GR.RR .* sin(GR.TT);
+
+% [EE, FF, GG, GR] = manVars('init', ranges, [dT,dr], gam, M0, 1);
+
 %% INITIALIZE
+
+EE = struct('fv',[],'GR', []);
+FF = EE; 
+GG = EE; 
+
 % Matrix Dimensions
 % 1:Y, 2:X, 3:vec, 4:t
-[EE, FF, GG, GR] = manVars('init', ranges, [dT,dr], gam, M0, 1);
+
+EE.fv = repmat(cat(3,   ones(size(GR.XX)),... % rho
+                        (cos(GR.TT).*(1 - (r_cyl^2)./(GR.RR.^2))),... % rho * u
+                        (-(1 + (r_cyl^2)./(GR.RR.^2)).*sin(GR.TT)),...% rho * v
+                        ones(size(GR.XX))./(gam*(gam-1)*M0^2) + 0.5,... % rho * E
+                        1/(gam * M0^2).*ones(size(GR.XX))),... % P ... eps_mach error here?
+                        1, 1, 1, 3); 
+
+% EE.fv(:,:,5,:) = repmat((EE.fv(:,:,4,2) - 0.5.*(EE.fv(:,:,2,2).^2 + EE.fv(:,:,3,2).^2)./EE.fv(:,:,1,2)).*(gam - 1),1,1,1,3);
+EE.fx_f = zeros(size(EE.fv(:,:,:,2)));
+EE.fx_b = EE.fx_f;
+EE.fy_f = EE.fx_f;
+EE.fy_b = EE.fx_f;
+
+FF.fv = repmat(EE.fv(:,:,2,2)./EE.fv(:,:,1,2),1,1,size(EE.fv,3)) .* EE.fv(:,:,:,2);
+FF.fx = zeros(size(FF.fv));
+
+GG.fv = repmat(EE.fv(:,:,3,2)./EE.fv(:,:,1,2),1,1,size(EE.fv,3)) .* EE.fv(:,:,:,2);
+GG.fy = zeros(size(GG.fv));
 
 %% Boundary Condition
 
@@ -40,28 +71,22 @@ ranges = [  0,  pi;...  % theta
 BC.W = {    0,  'N';... rho
             0,  'N';... rho*u -> radial velocity
             0,  'D';... rho*v -> angular velocity...on line of symmetry
-            1./(gam*(gam-1)*M0^2)+0.5,  'N';...  rho*E
-            1/(gam*M0^2), 'D';... % P
+            0,  'N';...  rho*E
+            0,  'N';... % P
             };
             
-BC.N = {    1, 'D';...  rho
-            (cos(GR.TT(end,:)).*(1 - (r_cyl^2)./((GR.RR(end,:)+dr).^2))).*(GR.RR(end,:)+dr)
+BC.N = {    ones(size(GR.TT(end,:))), 'D';...  rho
+            (cos(GR.TT(end,:)).*(1 - (r_cyl^2)./((GR.RR(end,:)+dr).^2))).*(GR.RR(end,:)+dr), 'D';...
+            (-(1 + (r_cyl^2)./((GR.RR(end,:)+dr).^2)).*sin(GR.TT(end,:))), 'D';
+            ones(size(GR.TT(end,:))).*(1./(gam*(gam-1)*M0^2)+0.5),  'D';...  rho*E
+            ones(size(GR.TT(end,:)))./(gam*M0^2), 'D';... % P
             };
             
-if M0 > 1          
-    BC.E = {    0,  'N';... 
-                0,  'N';...
-                0,  'N';...
-                0,  'N';...
-                0,  'N';...
-                };
-else
-    BC.E = BC.W;
-end
+BC.E = BC.W;
             
 BC.S = {    0,  'N';... 
-            0,  'N';...
-            0, 'D';... % wall is normal to this direction, i.e. wall is parallel to x-dir
+            0,  'D';... % wall is normal to radial direction
+            0,  'N';... 
             0,  'N';...
             0,  'N',...
             };
@@ -74,12 +99,15 @@ tic;
 while isempty(res) || ((max(res(end, :)) > tol*max(res(res<1)))|| (size(res,1) < iter_min)) % iterate through time
     
     %% Update Field Values
-    [EE, FF, GG] = manVars('update', EE, FF, GG, gam);
+    EE.fv(:,:,:,1:2) = EE.fv(:,:,:,2:3);
+    EE.fv(:,:,5,2) = (EE.fv(:,:,4,2) - 0.5.*(EE.fv(:,:,2,2).^2 + EE.fv(:,:,3,2).^2)./EE.fv(:,:,1,2)).*(gam - 1);
+    FF.fv = repmat(EE.fv(:,:,2,2)./EE.fv(:,:,1,2),1,1,size(EE.fv,3)) .* EE.fv(:,:,:,2);
+    GG.fv = repmat(EE.fv(:,:,3,2)./EE.fv(:,:,1,2),1,1,size(EE.fv,3)) .* EE.fv(:,:,:,2);
                 
     % Check CFL conditions
-    Ux = (EE.fv(:,:,2,2)./EE.fv(:,:,1,2));
-    Vy = (EE.fv(:,:,3,2)./EE.fv(:,:,1,2));
-    CFL_i = (max(abs(Ux(:)))./(dx) + max(abs(Vy(:)))./dy)*dt;
+    Ur = (EE.fv(:,:,2,2)./EE.fv(:,:,1,2));
+    VT = (EE.fv(:,:,3,2)./EE.fv(:,:,1,2))./GR.RR;
+    CFL_i = (max(abs(Ur(:)))./(dr) + max(abs(VT(:)))./dT)*dt;
 
     if CFL_i >= 1.0
        fprintf('CFL condition not met!\n');
@@ -91,14 +119,10 @@ while isempty(res) || ((max(res(end, :)) > tol*max(res(res<1)))|| (size(res,1) <
        fprintf('\n');
     end
     
-    %% Calculate X Derivative
-    FF.fx(:,2:end-1,:) = (FF.fv(:,3:end,:) - FF.fv(:,1:end-2,:))./(2*GR.dx); % central difference
-    if M0 > 1
-        FF.fx(:,end,:) = repmat(reshape(cell2mat(BC.E(:,1)),1,1,5),size(FF.fx,1),1,1);
-    else
-        FF.fx(:,end,:) = (BC.E{2,1}./BC.E{1,1}.*repmat(reshape(cell2mat(BC.E(:,1)),1,1,5),size(FF.fx,1),1,1) - FF.fv(:,end-1,:))./(2*GR.dx);
-    end
-    FF.fx(:,1,:) = (FF.fv(:,2,:) - BC.W{2,1}./BC.W{1,1}.*repmat(reshape(cell2mat(BC.W(:,1)),1,1,5),size(FF.fx,1),1,1))./(2*GR.dx);
+    %% Calculate Radial Derivative
+    FF.fr(2:end-1,:,:) = (FF.fv(3:end,:,:) - FF.fv(1:end-2,:,:))./(2*GR.dr); % central difference
+    FF.fr(end,:,:) = (reshape(cell2mat(BC.N(:,1)),[size(FF.fv(end,:,:))]).*repmat(BC.N{2,1},1,1,size(FF.fv,3)) - FF.fv(end-1,:,:))./(2*GR.dr);
+    FF.fr(1,:,:) = (FF.fv(:,2,:) - BC.W{2,1}./BC.W{1,1}.*repmat(reshape(cell2mat(BC.W(:,1)),1,1,5),size(FF.fx,1),1,1))./(2*GR.dx);
 
     EE.fx_f(:,1:end-1,:) = diff(EE.fv(:,:,:,2),1,2)./GR.dx; % forward difference
     EE.fx_b(:,2:end,:) = EE.fx_f(:,1:end-1,:); % backward difference

@@ -3,44 +3,91 @@ close all;
 clear;
 
 %% CT - simulation control, including tolerances, viscous factor gain, etc.
-eps_s = 0.005; % spatial diffusion term
-eps_t = 0.005; % time diffusion term
+eps_s = 0.00175; % spatial diffusion term
+% eps_t = 0.005; % time diffusion term
 tol = 1e-5;
-dt = 0.0125;
+dt = 2.16e-3;
 iter_min = 300;
 CFL_on = 1;
 
-case_name = 'cylFullEuler';
-
+case_name = 'machStep';
+    
 %% FL - fluid parameters
 gam = 1.4; % heat 
-M0 = 0.85;
+M0 = 3.0;
 
 %% GR - grid information, such as the meshfield, grid spacing (dr, dT, etc.)
 
 % Define Grid
-dT = 0.025*pi;
-dr = 0.05;
-
-r_cyl = 0.5;
+dx = 0.01;
+dy = 0.01;
 
 % Field Axis Values - body fitted grid
-ranges = [  0,  pi;...  % theta
-            r_cyl+0.5*dr,... % radius
-            20];
+% Field Axis Values - body fitted grid
+% x_range=[   -4-39*dx,...
+%             7 + 20*dx];
+x_range=[   0.5*dx,...
+            3];
+y_range=[   0.5*dy,...
+            1-0.5*dy];
+x_wall = 0.6;
+y_wall = 0.2;
+
+GR = struct('Y_vals',[], 'X_vals',[], 'XX',[], 'YY',[]);
+
+GR.y_vals = y_range(1):dy:y_range(2);
+GR.x_vals = x_range(1):dx:x_range(2);
+GR.dy = dy; GR.dx = dx;
+
+[GR.XX, GR.YY] = meshgrid(GR.x_vals, GR.y_vals);
+
+% Show Grid
+figure();
+plot(GR.XX,GR.YY, 'b-', GR.XX', GR.YY', 'b-');
+axis equal
+hold on;
+rectangle('Position',[x_wall 0 3-x_wall y_wall], 'FaceColor', [1 1 1], 'EdgeColor', [1 1 1]);
+stepInd = {GR.y_vals < y_wall, GR.x_vals > x_wall};
+wallIndX = (length(GR.x_vals) - sum(stepInd{2})+1);
         
 %% INITIALIZE
+
+EE = struct('fv',[],'GR', []);
+FF = EE; 
+GG = EE; 
+
 % Matrix Dimensions
 % 1:Y, 2:X, 3:vec, 4:t
-[EE, FF, GG, GR] = manVars('init', ranges, [dT,dr], gam, M0, 1);
+
+EE.fv = repmat(cat(3,   ones(size(GR.XX)),... % rho
+                        ones(size(GR.XX)),... % rho * u
+                        zeros(size(GR.XX)),...% rho * v
+                        ones(size(GR.XX))./(gam*(gam-1)*M0^2) + 0.5,... % rho * E
+                        1/(gam * M0^2).*ones(size(GR.XX))),... % P ... eps_mach error here?
+                        1, 1, 1, 3); 
+EE.fv(stepInd{1}, stepInd{2},:,:) = NaN;
+
+% EE.fv(:,:,5,:) = repmat((EE.fv(:,:,4,2) - 0.5.*(EE.fv(:,:,2,2).^2 + EE.fv(:,:,3,2).^2)./EE.fv(:,:,1,2)).*(gam - 1),1,1,1,3);
+EE.fx_f = zeros(size(EE.fv(:,:,:,2)));
+EE.fx_b = EE.fx_f;
+EE.fy_f = EE.fx_f;
+EE.fy_b = EE.fx_f;
+
+FF.fv = repmat(EE.fv(:,:,2,2)./EE.fv(:,:,1,2),1,1,size(EE.fv,3)) .* EE.fv(:,:,:,2);
+FF.fv(stepInd{1}, stepInd{2},:) = NaN;
+FF.fx = zeros(size(FF.fv));
+
+GG.fv = repmat(EE.fv(:,:,3,2)./EE.fv(:,:,1,2),1,1,size(EE.fv,3)) .* EE.fv(:,:,:,2);
+GG.fv(stepInd{1}, stepInd{2},:) = NaN;
+GG.fy = zeros(size(GG.fv));
 
 %% Boundary Condition
 
 % Vector E:
-BC.W = {    0,  'N';... rho
-            0,  'N';... rho*u -> radial velocity
-            0,  'D';... rho*v -> angular velocity...on line of symmetry
-            1./(gam*(gam-1)*M0^2)+0.5,  '0';...  rho*E
+BC.W = {    1.,  'D';... rho
+            1,  'D';... rho*u
+            0,  'D';... rho*v
+            1./(gam*(gam-1)*M0^2)+0.5,  'D';...  rho*E
             1/(gam*M0^2), 'D';... % P
             };
             
@@ -67,11 +114,15 @@ BC.S = {    0,  'N';...
 
 res = [];
 tic;
+tot_time = 0;
 
 while isempty(res) || ((max(res(end, :)) > tol*max(res(res<1)))|| (size(res,1) < iter_min)) % iterate through time
     
     %% Update Field Values
-    [EE, FF, GG] = manVars('update', EE, FF, GG, gam);
+    EE.fv(:,:,:,1:2) = EE.fv(:,:,:,2:3);
+    EE.fv(:,:,5,2) = (EE.fv(:,:,4,2) - 0.5.*(EE.fv(:,:,2,2).^2 + EE.fv(:,:,3,2).^2)./EE.fv(:,:,1,2)).*(gam - 1);
+    FF.fv = repmat(EE.fv(:,:,2,2)./EE.fv(:,:,1,2),1,1,size(EE.fv,3)) .* EE.fv(:,:,:,2);
+    GG.fv = repmat(EE.fv(:,:,3,2)./EE.fv(:,:,1,2),1,1,size(EE.fv,3)) .* EE.fv(:,:,:,2);
                 
     % Check CFL conditions
     Ux = (EE.fv(:,:,2,2)./EE.fv(:,:,1,2));
@@ -89,37 +140,43 @@ while isempty(res) || ((max(res(end, :)) > tol*max(res(res<1)))|| (size(res,1) <
     end
     
     %% Calculate X Derivative
+    
+    % manage wall step BC - reflective wall
+    FF.fv(stepInd{1}, wallIndX, :) = -FF.fv(stepInd{1}, wallIndX-1, :);
+    FF.fv(stepInd{1}, wallIndX, 2) = -FF.fv(stepInd{1}, wallIndX, 2);
+    EE.fv(stepInd{1}, wallIndX, :,2) = EE.fv(stepInd{1}, wallIndX-1, :,2);
+    EE.fv(stepInd{1}, wallIndX, 2,2) = -EE.fv(stepInd{1}, wallIndX, 2,2);
+    
     FF.fx(:,2:end-1,:) = (FF.fv(:,3:end,:) - FF.fv(:,1:end-2,:))./(2*GR.dx); % central difference
-    if M0 > 1
-        FF.fx(:,end,:) = repmat(reshape(cell2mat(BC.E(:,1)),1,1,5),size(FF.fx,1),1,1);
-    else
-        FF.fx(:,end,:) = (BC.E{2,1}./BC.E{1,1}.*repmat(reshape(cell2mat(BC.E(:,1)),1,1,5),size(FF.fx,1),1,1) - FF.fv(:,end-1,:))./(2*GR.dx);
-    end
+    FF.fx(:,end,:) = repmat(reshape(cell2mat(BC.E(:,1)),1,1,5),size(FF.fx,1),1,1);
     FF.fx(:,1,:) = (FF.fv(:,2,:) - BC.W{2,1}./BC.W{1,1}.*repmat(reshape(cell2mat(BC.W(:,1)),1,1,5),size(FF.fx,1),1,1))./(2*GR.dx);
 
     EE.fx_f(:,1:end-1,:) = diff(EE.fv(:,:,:,2),1,2)./GR.dx; % forward difference
     EE.fx_b(:,2:end,:) = EE.fx_f(:,1:end-1,:); % backward difference
-    if M0 > 1 % Neumann condition for supersonic flow
-        EE.fx_f(:,end,:) = (EE.fv(:,end-1,:,2) - EE.fv(:,end,:,2))./GR.dx; % right boundary
-    else % Dirichlet/Free-Stream Condition for Subsonic FLow
-        EE.fx_f(:,end,:) = (repmat(reshape(cell2mat(BC.E(:,1)),1,1,5),size(FF.fx,1),1,1) - EE.fv(:,end,:,2))./GR.dx; % right boundary
-    end
+    EE.fx_f(:,end,:) = (EE.fv(:,end-1,:,2) - EE.fv(:,end,:,2))./GR.dx; % right boundary
     EE.fx_b(:,1,:) = (EE.fv(:,1,:,2) - repmat(reshape(cell2mat(BC.W(:,1)),1,1,5),size(EE.fv,1),1,1))./(GR.dx); % left boundary
     EE.fx = 0.5.*(EE.fx_f + EE.fx_b); % central diff -> extract P_x
     
     %% Calculate Y Derivative
+    
+    % manage wall step BC - reflective wall?
+    GG.fv(sum(stepInd{1}), stepInd{2}, :) = -GG.fv(sum(stepInd{1})+1, stepInd{2}, :);
+    GG.fv(sum(stepInd{1}), stepInd{2}, 3) = -GG.fv(sum(stepInd{1}), stepInd{2}, 3);
+    EE.fv(sum(stepInd{1}), stepInd{2}, :,2) = EE.fv(sum(stepInd{1})+1, stepInd{2}, :,2);
+    EE.fv(sum(stepInd{1}), stepInd{2}, 3,2) = -EE.fv(sum(stepInd{1}), stepInd{2}, 3,2);
+    
     GG.fy(2:end-1,:,:) = (GG.fv(3:end,:,:) - GG.fv(1:end-2,:,:))./(2*GR.dy);
-    GG.fy(end,:,:) = (BC.N{3,1}./BC.N{1,1}.*repmat(reshape(cell2mat(BC.N(:,1)),1,1,5),1,size(GG.fy,2),1) - GG.fv(end-1,:,:))./(2*GR.dy); % multiply v (B/rho) to BC before operating on boundary
-    GG_S = repmat(BC.S{3,1},1,1,size(EE.fv,3)).*EE.fv(1,:,:,2); % assume dyBdx = v -> v * EE
-    GG_S(:,:,3) = EE.fv(1,:,1,2).*BC.S{3,1}.^2;
-    GG.fy(1,:,:) = 0.5.*(diff(GG.fv(1:2,:,:),1,1)./GR.dy + (GG.fv(1,:,:) - GG_S)./(0.5*GR.dy));
+    GG.fy(end,:,:) = (-GG.fv(end,:,:) - GG.fv(end-1,:,:))./(2*GR.dy); % change sign b/c of reflected boundary
+    GG.fy(end,:,3) = (GG.fv(end,:,3) - GG.fv(end-1,:,3))./(2*GR.dy); % scalar vals are not reflected in direction
+    GG.fy(1,:,:) = (GG.fv(2,:,:) + GG.fv(1,:,:))./(2*GR.dy);
+    GG.fy(1,:,3) = (GG.fv(2,:,3) - GG.fv(1,:,3))./(2*GR.dy); % scalar vals are not reflected in direction
     
     EE.fy_f(1:end-1,:,:) = diff(EE.fv(:,:,:,2),1,1)./GR.dy;
     EE.fy_b(2:end,:,:) = EE.fy_f(1:end-1,:,:);
-    EE.fy_f(end,:,:) = (repmat(reshape(cell2mat(BC.N(:,1)),1,1,5),1,size(EE.fv,2),1) - EE.fv(end,:,:,2))./GR.dy;
-    EE_S = EE.fv(1,:,:,2);
-    EE_S(:,:,3) = BC.S{3,1}.* EE.fv(1,:,1,2);
-    EE.fy_b(1,:,:) = (EE.fv(1,:,:,2) - EE_S)./(0.5*GR.dy);
+    EE.fy_f(end,:,:) = (EE.fv(end,:,:,2) - EE.fv(end,:,:,2))./GR.dy;
+    EE.fy_f(end,:,3) = (-EE.fv(end,:,3,2) - EE.fv(end,:,3,2))./GR.dy;
+    EE.fy_b(1,:,:) = (EE.fv(1,:,:,2) - EE.fv(1,:,:,2))./(GR.dy);
+    EE.fy_b(1,:,3) = (EE.fv(1,:,3,2) + EE.fv(1,:,3,2))./(GR.dy); % direction must be reflected across boundary
     EE.fy = 0.5.*(EE.fy_f + EE.fy_b);
     
     %% Calculate Laplacians 
@@ -134,6 +191,8 @@ while isempty(res) || ((max(res(end, :)) > tol*max(res(res<1)))|| (size(res,1) <
                         EE.fy(:,:,end),...
                         FF.fx(:,:,end) + GG.fy(:,:,end));
     EE.fv(:,:,1:4,3) = (eps_s.*(EE.laplace + DF.*EE.fv(:,:,1:4,2)) - 0.5*EE.fv(:,:,1:4,1).*(eps_s*DF - 1/dt) - (FF.fx(:,:,1:4) + GG.fy(:,:,1:4) + pTerms))./(0.5/dt + 0.5*eps_s*DF);
+    EE.fv(stepInd{1}, stepInd{2},:,:) = NaN;
+    tot_time = tot_time + dt;
     
     %% Calculate Residual
     
@@ -143,6 +202,23 @@ while isempty(res) || ((max(res(end, :)) > tol*max(res(res<1)))|| (size(res,1) <
         res(end+1,:) = reshape(max(max(abs(EE.fv(:,:,1:4,3) - EE.fv(:,:,1:4,2)))),1,4,1);
     end
 
+%     figure(1);
+% %     hold on;
+%     for i = 1:size(res,2)
+%         semilogy(1:size(res,1), res(:,i));
+%         hold on;
+%     end
+%     hold off;
+%     legend('Density', '\rho u', '\rho v', '\rho \epsilon', 'Location' ,'bestoutside');
+    figure(2);
+    contourf(GR.XX,GR.YY,EE.fv(:,:,1,3), 50)
+    title(sprintf('Density (Normalized), t=%0.5e, dx=%0.2f', tot_time, dx));
+    colorbar('eastoutside');
+    axis equal
+    drawnow;
+    if (abs(4 - tot_time) < dt) && (tot_time > 4)
+        saveas(gcf, [case_name '_' num2str(dx) '_' num2str(eps_s) '_density.pdf']);
+    end
     
     if (size(res, 1) > 500) && (mod(size(res, 1), 2000) == 0)
         fprintf('Iteration Ct: %i\n', size(res, 1));
@@ -154,10 +230,11 @@ while isempty(res) || ((max(res(end, :)) > tol*max(res(res<1)))|| (size(res,1) <
         semilogy(1:size(res,1), res(:,3));
         hold off;
         legend('Density', '\rho u', '\rho v', 'Location' ,'bestoutside');
+%         drawnow;
         fprintf('\n');
     end
     
-    if (~isreal(EE.fv(:,:,:,end)) || any(any(any(isnan(EE.fv(:,:,:,end))))))
+    if (~isreal(EE.fv(not(stepInd{1}),not(stepInd{2}),:,end)) || any(any(any(isnan(EE.fv(not(stepInd{1}),not(stepInd{2}),:,end))))))
         error('Solution exhibits non-solutions (either non-real or NaN) in nodes!\n');
 %         break;
     end

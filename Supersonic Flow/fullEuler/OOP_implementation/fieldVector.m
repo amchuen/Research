@@ -6,6 +6,8 @@ classdef fieldVector
         fv % field value
         bc % boundary conditions
         ct % control variables
+        
+        vecNum
 
         % gradient derivs
         f_1f % gradient in row direction (1), forward (f)
@@ -132,7 +134,7 @@ classdef fieldVector
     
     methods % three-level-scheme related operations
         
-        function obj = update_fv(obj, updateVals)
+        function obj = update_fv(obj, updateVals) % need to include operation to update the values as well
         % this function updates the field values for the fieldVector
             if ((nargin == 1) && (length(size(obj.fv)) == 4))
                % vector has time dimension in it, and only needs to step
