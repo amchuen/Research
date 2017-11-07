@@ -4,7 +4,7 @@ clear;
 
 %% CT - simulation control, including tolerances, viscous factor gain, etc.
 eps_s = 0.005; % spatial diffusion term
-eps_t = 0.0013; % time diffusion term
+eps_t = 0.0025; % time diffusion term
 tol = 1e-4;
 dt = 0.002; %0.01;
 iter_min = 300;
@@ -14,7 +14,7 @@ case_name = 'biconvex_test';
 
 %% FL - fluid parameters
 gam = 1.4; % heat 
-M0 = 1.4;
+M0 = 1.2;
 
 %% GR - grid information, such as the meshfield, grid spacing (dx, dy, etc.)
 % Define Grid
@@ -55,7 +55,7 @@ YY_B = [zeros(size(GR.x_vals(GR.x_vals <0))), ...
 dyBdx = zeros(size(YY_B));
 
 for i = 2:(length(YY_B)-1)
-   dyBdx(i+1) = (YY_B(i) - YY_B(i-1))/(2*dx);
+   dyBdx(i+1) = (YY_B(i) - YY_B(i-1))/(dx);
 end
 
 %% Boundary Conditions

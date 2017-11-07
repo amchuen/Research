@@ -6,6 +6,8 @@ classdef fieldVector
         fv % field value
         bc % boundary conditions
         ct % control variables
+        
+        vecNum
 
         % gradient derivs
         f_1f % gradient in row direction (1), forward (f)
@@ -105,7 +107,7 @@ classdef fieldVector
             for i = 1:length(fnames) % loop through directions
                 % generate temporary array of values from
                 % scalars or vectors                
-                BC_vals = obj.getBCvals(FF, dir);
+                BC_vals = obj.getBCvals(FF, fnames{i});
                 
                 % assign the boundary conditions to the corresponding
                 % gradient matrices
@@ -132,12 +134,12 @@ classdef fieldVector
     
     methods % three-level-scheme related operations
         
-        function obj = update_fv(obj, updateVals)
+        function obj = update_fv(obj, updateVals) % need to include operation to update the values as well
         % this function updates the field values for the fieldVector
             if ((nargin == 1) && (length(size(obj.fv)) == 4))
                % vector has time dimension in it, and only needs to step
                % forward in time
-               obj.fv(:,:,:,1:2) = obj.fv(:,:,:,2:3);
+               obj.fv(:,:,:,1:end-1) = obj.fv(:,:,:,2:end);
             elseif ((nargin == 2))
                 % updated values must be passed into the new vector
                 for i = 1:length(updateVals)
@@ -149,13 +151,13 @@ classdef fieldVector
             end            
         end
         
-        function obj = update_bc(obj, dir, updateVals)
+        function obj = update_bc(obj, dir, bcIdx, updateVals)
            % need to somehow access boundary conditions easily at relevant
            % locations based on wall and etc.
            
             for ii = 1:length(updateVals)
                 if ~isempty(updateVals{ii})
-                    obj.bc.(dir).val{ii} = updateVals{ii};
+                    obj.bc.(dir)(bcIdx).val{ii} = updateVals{ii};
                 end
             end
             
@@ -163,56 +165,74 @@ classdef fieldVector
     end
     
     methods % getter functions
-        function output = get_boundVal(obj, dir, varargin)
+        function output = get_boundVal(obj, DIR, tIdx, eIdx, varargin)
             % INPUTS: 
-                % varargin - 1st input is time index
-                %           2nd input is the element index
+                % varargin -    1st input is rangeMin
+                %               2nd input is rangeMax
+                %               3rd input is patch depth
             
             % Parse variable inputs for time and element indexing
             % information
-            t_dim = [];
-            elem = [];
+            if strcmpi(DIR, 'W') || strcmpi(DIR, 'E')
+                nodes = obj.gr.d1vals;
+            elseif strcmpi(DIR, 'S') || strcmpi(DIR, 'N')
+                nodes = obj.gr.d2vals;
+            end
+            depth = 1;
             if ~isempty(varargin)
                 if ~isempty(varargin{1})
-                    t_dim = varargin{1};
+                    rMin = nodes > varargin{1};
                 end
-                if length(varargin) >= 2
-                    elem = varargin{2};
+                if ~isempty(varargin{2})
+                    rMax = nodes < varargin{2};
+                end
+                
+                if length(varargin) > 2
+                    depth = 2;
                 end
             end
             
+            if ~exist('rMin', 'var')
+                rMin = ones(size(nodes));
+            end
+            
+            if ~exist('rMax', 'var')
+                rMax = ones(size(nodes));
+            end
+            
+            outIdx = find(rMin & rMax);
+            
             % If time is still empty, select default time
-            if isempty(t_dim)
-                switch length(size(obj.fv))
-                    case 4
-                        t_dim = 2;
-                    case 3
-                        t_dim = 1;
+            if isempty(tIdx)
+                if length(size(obj.fv)) == 4
+                    tIdx = 2;
+                else
+                    tIdx = 1;
                 end
             end
             
             % Perform boundary value extraction
-            switch dir
+            switch DIR
                case 'W'
-                   output = obj.fv(:,1,:,t_dim);
+                   output = obj.fv(outIdx,depth,:,tIdx);
                case 'E'
-                   output = obj.fv(:,end,:,t_dim);
+                   output = obj.fv(outIdx,end+1 - depth,:,tIdx);
                case 'S'
-                   output = obj.fv(1,:,:,t_dim);
+                   output = obj.fv(depth,outIdx,:,tIdx);
                case 'N'
-                   output = obj.fv(end,:,:,t_dim);
+                   output = obj.fv(end+1 - depth,outIdx,:,tIdx);
             end
             
             % Select element if specified
-            if ~isempty(elem)
-                output = output(:,:,elem);
+            if ~isempty(eIdx)
+                output = output(:,:,eIdx);
             end
         end
         
-        function output = get_boundCondVal(obj, dir, varargin)
+        function output = get_boundCondVal(obj, DIR, bcIdx, varargin)
             % OUTPUT: this function outputs the bc values for the given
             % direction
-            output = obj.bc.(dir).val;
+            output = obj.bc.(DIR)(bcIdx).val;
             
             if ~isempty(varargin)
                 output = output{varargin{1}};
@@ -224,61 +244,71 @@ classdef fieldVector
     
     methods % helper functions for calculating the gradients
         
-        function BC_vals = getBCvals(obj, FF, dir)
+        function BC_vals = getBCvals(obj, FF, DIR)
             
             % Setup output to proper size
-            if strcmpi(dir, 'W') || strcmpi(dir, 'E')
-                node_pts = obj.GR.d11(:,1);
-            elseif strcmpi(dir, 'S') || strcmpi(dir, 'N')
-                node_pts = obj.GR.d22(1,:);
+            if strcmpi(DIR, 'W') || strcmpi(DIR, 'E')
+                node_pts = obj.gr.d11(:,1);
+            elseif strcmpi(DIR, 'S') || strcmpi(DIR, 'N')
+                node_pts = obj.gr.d22(1,:);
             end
-            BC_vals = zeros([size(node_pts),3]);
+            BC_vals = zeros([size(node_pts),size(obj.fv,3)]);
             
-            
-            for i = 1:length(obj.bc.(dir)) % loop through each subrange
+            verify = zeros(size(node_pts));
+            for i = 1:length(obj.bc.(DIR)) % loop through each subrange
                 
                 % Extract the corresponding field values
-                if ~isempty(obj.bc.(dir)(i).ranges)
-                    min_val = ;
-                    max_val = obj.bc.(dir)(i).ranges(2);
-                    dim_idx = (node_pts > obj.bc.(dir)(i).ranges(1)) & (node_pts < max_val);
-                    if strcmpi(dir, 'W') || strcmpi(dir, 'E')
+                if ~isempty(obj.bc.(DIR)(i).range)
+                    dim_idx = (node_pts > obj.bc.(DIR)(i).range(1)) & (node_pts < obj.bc.(DIR)(i).range(2));
+                    if strcmpi(DIR, 'W') || strcmpi(DIR, 'E')
                         FF_sub = FF(dim_idx,:,:);
-                    elseif strcmpi(dir, 'S') || strcmpi(dir, 'N')
+                    elseif strcmpi(DIR, 'S') || strcmpi(DIR, 'N')
                         FF_sub = FF(:,dim_idx,:);
                     end
-                elseif isempty(obj.BC.(dir)(i).ranges) || (length(obj.bc.(dir)) == 1)
+                elseif isempty(obj.bc.(DIR)(i).range) || (length(obj.bc.(DIR)) == 1)
                     FF_sub = FF;
-                    dim_idx = ones(size(node_pts));
+                    dim_idx = true(size(node_pts));
                 else
                     error('Ranges not specified!\n');
                 end
                 
-                if strcmp(obj.bc.(dir)(i).physical, 'sym')
-                    BC_temp = obj.gen_symBC(FF_sub, dir, obj.bc.(dir)(i).numerical);
+                % calculate partitioned bc
+                if strcmp(obj.bc.(DIR)(i).physical, 'sym')
+                    BC_temp = obj.gen_symBC(FF_sub, DIR, obj.bc.(DIR)(i).numerical);
 
-                elseif strcmp(obj.bc.(dir)(i).physical, 'wall')
-                    BC_temp = obj.gen_wallBC(FF_sub, dir, obj.bc.(dir)(i).numerical, obj.bc.(dir)(i).val);
+                elseif strcmp(obj.bc.(DIR)(i).physical, 'wall')
+                    BC_temp = obj.gen_wallBC(FF_sub, DIR, obj.bc.(DIR)(i).numerical, obj.bc.(DIR)(i).val);
 
                 else
-                    BC_temp = obj.gen_regBC(FF_sub, dir, obj.bc.(dir)(i).numerical, obj.bc.(dir)(i).val);
+                    BC_temp = obj.gen_regBC(FF_sub, DIR, obj.bc.(DIR)(i).numerical, obj.bc.(DIR)(i).val);
                 end     
                 
-                if strcmpi(dir, 'W') || strcmpi(dir, 'E')
+                % assign accordingly
+                if strcmpi(DIR, 'W') || strcmpi(DIR, 'E')
                     BC_vals(dim_idx,:,:) = BC_temp;
-                elseif strcmpi(dir, 'S') || strcmpi(dir, 'N')
+                elseif strcmpi(DIR, 'S') || strcmpi(DIR, 'N')
                     BC_vals(:,dim_idx,:) = BC_temp;
                 end
-            end            
+                
+                % verify that all points have been assigned?
+                verify = verify + dim_idx;
+            end
+            
+            if any(verify > 2)
+               error('Redefine ranges! Boundary conditions are overassigned at various points!\nDir: %s \n', DIR);
+            elseif any(verify == 0)
+                error('Redefine ranges! Boundary conditions are underassigned at various points!\nDir: %s \n', DIR);
+            end
+            
         end
         
-        function BC_vals = gen_symBC(obj, FF, dir, num_types)
+        function BC_vals = gen_symBC(obj, FF, DIR, num_types)
             BC_vals = [];
             for ii = 1:size(FF,3) % loop through vector "elements"
                 % symmetry will likely appear right on the
                 % boundary of the grid... maybe need to
                 % account for displaced symmetry?? 
-                switch dir
+                switch DIR
                     case 'W'
                         if strcmp(num_types{ii}, 'N')
                             BC_vals = cat(3, BC_vals, (FF(:,1,ii) - FF(:,2,ii))./obj.gr.d2);
@@ -312,10 +342,10 @@ classdef fieldVector
             
         end
         
-        function BC_vals = gen_regBC(obj, FF, dir, num_types, vals)
+        function BC_vals = gen_regBC(obj, FF, DIR, num_types, vals)
             BC_vals = [];
             for ii = 1:size(obj.fv, 3)
-                switch dir
+                switch DIR
                     case 'W'
                         if isscalar(vals{ii})
                             temp_BC = vals{ii}.*ones(size(FF,1),1);
@@ -388,10 +418,10 @@ classdef fieldVector
            end
         end
         
-        function BC_vals = gen_wallBC(obj, FF, dir, num_types, vals)
+        function BC_vals = gen_wallBC(obj, FF, DIR, num_types, vals)
             BC_vals = [];
             for ii = 1:size(obj.fv, 3)
-                switch dir
+                switch DIR
                     case 'W'
                         if isscalar(vals{ii})
                             temp_BC = vals{ii}.*ones(size(FF,1),1);
