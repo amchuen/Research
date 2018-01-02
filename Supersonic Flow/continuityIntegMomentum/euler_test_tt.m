@@ -196,6 +196,8 @@ while (res(end) > tol)|| (length(res) < iter_min) % iterate through time
         fprintf('Iteration loop breaking at %i iterations.\n', length(res)) 
         break;
     end
+    
+    drawnow;
 end
 
 fprintf('\nCalculation Complete!\n');

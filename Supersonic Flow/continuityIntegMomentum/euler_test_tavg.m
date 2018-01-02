@@ -179,6 +179,9 @@ while (res(end) > tol)|| (length(res) < iter_min) % iterate through time
         break;
     end
     
+    figure(1);contourf(XX, YY, RHO(:,:,end), 50);
+    colorbar();
+    drawnow;
 end
 
 fprintf('\nCalculation Complete!\n');
