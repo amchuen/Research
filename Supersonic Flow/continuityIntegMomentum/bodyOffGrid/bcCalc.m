@@ -179,7 +179,6 @@ function BC_vals = gen_wallBC(GR, BC, FF, DIR)
             indPhi = reshape(strcmp(BC.(DIR).varType, 'phi'),1,1,size(FF,3)); % checks for potential
             indNorm = reshape(strcmp(BC.(DIR).varType, 'v1'),1,1,size(FF,3));
             BC_vals = (  FF(1,:,:)... .*(indTan+indScalar)...
-                            - GR.dy.*reshape(BC.(DIR).dydx,1,size(FF,2)).*indPhi...
-                            + reshape(BC.(DIR).dydx,1,size(FF,2)).*indTan.*FF(1,:,:).*indNorm);... - FF(1,:,:);
+                            - GR.dy.*reshape(BC.(DIR).dydx,1,size(FF,2)).*indPhi);... - FF(1,:,:);
     end
 end

@@ -4,13 +4,15 @@ clear;
 
 %% GR - grid information, such as the meshfield, grid spacing (dx, dy, etc.)
 % Define Grid
-dx = 0.04;
-dy = 0.04;
+dx = 0.05;
+dy = 0.08;
 
 % Field Axis Values
-y_max = 15;
-x_max = 7+20*dx;
-x_min = -7-39*dx; %(-19*dx);
+y_max = 50.*dy; %25;
+x_min = -20*dx;
+% x_max = 11;
+x_max = 39*dx; %(-19*dx);
+% x_min = -10;
 x_vals = x_min:dx:x_max;
 y_vals = 0:dy:y_max;
 [GR.XX, GR.YY] = meshgrid(x_vals, y_vals);
@@ -19,23 +21,23 @@ GR.dy = dy;
 
 %% FL - fluid parameters
 FL.gam = 1.4; % heat 
-FL.M0 = 0.85;
+FL.M0 = 1.1;
 
 %% Simulation control, including tolerances, viscous factor gain, etc.
 
 GR.tol = 1e-5;
 GR.tEnd = 0.2; % 10 seconds maximum?
-GR.dt = dx^2;
-GR.CFL = 0.0625*0.25;
+GR.dt = dx;
+GR.CFL = 1;
 
 %% Diffusion Coefficients
 
-epsFunc = @(GR, BC, DIR) 0.002;
+epsFunc = @(GR, BC, DIR) 0.005;
 
 %% Boundary Conditions
 
 % % Body Values - Ramp
-tau = 0.1;
+tau = 0.05;
 m_x = tand(8); % dy/dx
 % x_vals = x_vals;
 % dx = dx;
@@ -63,7 +65,7 @@ BC.N.dydx = 0;
 
 % Inlet
 BC.W = BC.N;
-BC.W.val = {1, x_vals(1)-GR.dx};
+BC.W.val = {1, x_vals(1)};
 
 % Wall
 BC.S.physical = 'wall';
@@ -71,13 +73,21 @@ BC.S.varType = BC.N.varType;
 BC.S.dydx = dyBdx;
 
 % Outlet
-% BC.E.physical = 'outlet';
-% BC.E.varType = BC.N.varType;
-BC.E = BC.N;
-BC.E.val = {1, x_vals(end)+GR.dx};
+BC.E.physical = 'outlet';
+BC.E.varType = BC.N.varType;
+% BC.E = BC.N;
+% BC.E.val = {1, x_vals(end)};
 
 %% Run Simulation
 
 U0 = cat(3, ones(size(GR.XX)), GR.XX);
 
 OUT = dufortFrankel(GR, FL, BC, @CIPMcart, epsFunc, U0);
+
+%% Post Process
+close all;
+
+folderName = ['M_' num2str(FL.M0)];
+dirName = [pwd '\biconvex\' folderName '\'];
+postProcess(GR, OUT, dirName);
+save([dirName 'OUT']);
