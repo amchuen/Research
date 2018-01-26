@@ -1,0 +1,18 @@
+\begin{thebibliography}{1}
+
+\bibitem{book}
+J.~Doe.
+\newblock {\em {Important book title: A complete work}}.
+\newblock ACME, 2012.
+
+\bibitem{journalpaper}
+John Doe and B.~Schmit.
+\newblock {Novel approach to innovation and synergy}.
+\newblock {\em Int. J. Sci. Tech.}, 54(3):695--706, 2012.
+
+\bibitem{paper}
+C.~F.~D. Expert.
+\newblock {CFD for Dummies}.
+\newblock {AIAA Paper 2010--0000}, 2010.
+
+\end{thebibliography}

@@ -50,3 +50,35 @@ Temporary Items
 Reports/Winter_Report.aux
 *.log
 *.mat
+*.asv
+*.pdf
+*.asv
+Supersonic Flow/equations/cartEulerCaseRun.m
+*.bib
+*.tex
+*.tex
+*.gz
+*.gz
+Supersonic Flow/Report/abstract/AbstractTemplateICCFD10Tex/AbstractTemplateICCFD10.aux
+Supersonic Flow/Report/diamond_cases/reProcess.m
+Supersonic Flow/Report/diamond_cases/bcCalc.m
+Supersonic Flow/Report/cylinder_cases/gen_plots.m
+Supersonic Flow/Report/diamond_cases/gen_plots.m
+Supersonic Flow/equations/continuityIntegMomentum/cylinderOffGrid/cylinder/M_1.4/reProcess.m
+Supersonic Flow/equations/continuityIntegMomentum/cylinderOffGrid/cylinder/M_1.1/reProcess.m
+Supersonic Flow/equations/continuityIntegMomentum/cylinderOffGrid/cylinder/M_1.4/bcCalc.m
+Supersonic Flow/equations/continuityIntegMomentum/cylinderOffGrid/cylinder/M_1.1/bcCalc.m
+Supersonic Flow/equations/continuityIntegMomentum/cartCaseRun.m
+Supersonic Flow/Report/abstract/AbstractTemplateICCFD10Tex/AbstractTemplateICCFD10.aux
+Supersonic Flow/Report/abstract/AbstractTemplateICCFD10Tex/AbstractTemplateICCFD10.aux
+*.bbl
+Supersonic Flow/Report/abstract/AbstractTemplateICCFD10Tex/abstract_draft.blg
+*.tex
+*.aux
+Supersonic Flow/Report/abstract/AbstractTemplateICCFD10Tex/AbstractTemplateICCFD10.aux
+Supersonic Flow/Report/abstract/AbstractTemplateICCFD10Tex/AbstractTemplateICCFD10.aux
+*.gz
+Supersonic Flow/Report/abstract/AbstractTemplateICCFD10Tex/AbstractTemplateICCFD10.synctex.gz
+Supersonic Flow/Report/abstract/AbstractTemplateICCFD10Tex/AbstractTemplateICCFD10.aux
+*.tex
+Supersonic Flow/Report/abstract/AbstractTemplateICCFD10Tex/AbstractTemplateICCFD10.tex
