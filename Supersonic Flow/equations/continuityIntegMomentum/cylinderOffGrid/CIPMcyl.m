@@ -1,4 +1,4 @@
-function [fvOUT, waveSpd] = CIPMcart(GR, FL, BC, FF)
+function [fvOUT, waveSpd] = CIPMcyl(GR, FL, BC, FF)
 
 fvOUT = zeros(size(FF));
 
@@ -36,8 +36,8 @@ fvOUT(:,:,2) = PP + 0.5.*(phi2.^2 + phi1.^2 - 1);
 
 %% Calculate Stability Output
 % rho = FF(:,:,1);
-phi2w = phi2;%./GR.RR;
-phi1w = phi1;%./GR.RR;
+phi2w = phi2;%./(GR.RR.*2.*GR.dT) ;%./GR.RR;
+phi1w = phi1;%./(2.*GR.dR);%./GR.RR;
 % rhow = rho;%./GR.RR;
 % waveSpd = [max([max(abs(phi2w(:))), max(rhow(:))]), max([max(abs(phi1w(:))), max(rhow(:))])];
 waveSpd = [max(abs(phi2w(:))), max(abs(phi1w(:)))];

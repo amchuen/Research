@@ -41,6 +41,8 @@ while norm(res(end,:)) > GR.tol || time(end) < GR.tEnd
     % Calculate non-diffusive terms
     [funcOut, waveSpd] = func(GR, FL, BC, UU.fv(:,:,:,2));
     alphaWave = 2.*(waveSpd(1)./(2.*epsFunc(GR, BC, 'X')) + waveSpd(2)./(2.*epsFunc(GR,BC,'Y')))*GR.dt;
+%     alphaWave = sqrt(waveSpd(1)^2 + waveSpd(2)^2).*GR.dt./(epsFunc(GR, BC, 'X'));% (max(abs(Ur(:))) + max(abs(VT(:))))*dt./eps_s;
+%     alphaWave = (waveSpd(1)+ waveSpd(2)).*GR.dt;
     
     % Check CFL
     cflFactor = 1;
@@ -79,7 +81,7 @@ while norm(res(end,:)) > GR.tol || time(end) < GR.tEnd
     end
     
     % Calculate Residual
-    res(end+1,:) = resCalc(GR, UU.fv(:,:,:,end:-1:end-2));    
+    res(end+1,:) = resCalc(GR, UU.fv(:,:,:,end-1:end));    
     time(end+1) = time(end) + GR.dt;
     
     % Run Additional Time-Stepping Checks
@@ -98,7 +100,7 @@ while norm(res(end,:)) > GR.tol || time(end) < GR.tEnd
     
     if (length(res) >= 500) && (mod(length(res), 500) == 0)
         fprintf('Iteration Ct: %i\n', length(res));
-        fprintf('Current Residual: %0.5e\n', res(end));
+        fprintf('Current Residual: %0.5e\n', max(res(end,:)));
     end
     
     figure(1);
@@ -125,7 +127,8 @@ function res = resCalc(GR, Uvals)
 
 % checks steady state by calculateing Ut?
 for i = 1:size(Uvals,3)
-    tempres = abs(Uvals(:,:,i,end) - Uvals(:,:,i,end-1));%./GR.dt;
+    tempres = abs(Uvals(:,:,i,end) - Uvals(:,:,i,end-1))./GR.dt;
+%     tempres = abs(Uvals(:,:,i,end)./Uvals(:,:,i,end-1));%./GR.dt;
     res(i) = max(tempres(:));
 end
 

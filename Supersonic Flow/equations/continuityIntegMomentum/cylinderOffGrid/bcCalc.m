@@ -22,6 +22,7 @@ function BC_vals = bcCalc(GR, BC, fv, DIR, varargin)
 %     end
 
     % calculate partitioned bc
+    
     if strcmp(BC.(DIR).physical, 'sym')
         BC_temp = gen_symBC(GR, BC, fv, DIR);
     elseif strcmp(BC.(DIR).physical, 'wall')
@@ -108,7 +109,8 @@ function BC_vals = gen_outletBC(GR, BC, FF, DIR)
         case 'W'
             indTan = reshape(strcmp(BC.(DIR).varType, 'v1'),1,1,size(FF,3)) + reshape(strcmp(BC.(DIR).varType, 'v2'),1,1,size(FF,3)) + reshape(strcmp(BC.(DIR).varType, 's'),1,1,size(FF,3));
             indPhi = reshape(strcmp(BC.(DIR).varType, 'phi'),1,1,size(FF,3)); % checks for potential
-            BC_vals = FF(:,2,:).*indTan + (2.*FF(:,1,:) - FF(:,2,:)).*indPhi;
+%             BC_vals = FF(:,2,:).*indTan + (2.*FF(:,1,:) - FF(:,2,:)).*indPhi;
+            BC_vals = (4/3.*FF(:,1,:) - 1/3.*FF(:,2,:)).*indTan + (2.*FF(:,1,:) - FF(:,2,:)).*indPhi;
 %             BC_vals = FF(:,1,:);
 
         case 'E' 
@@ -230,13 +232,16 @@ function BC_vals = gen_wallBC(GR, BC, FF, DIR)
             indTan = reshape(strcmp(BC.(DIR).varType, 'v2'),1,1,size(FF,3));
             indScalar = reshape(strcmp(BC.(DIR).varType, 's'),1,1,size(FF,3));
             indPhi = reshape(strcmp(BC.(DIR).varType, 'phi'),1,1,size(FF,3)); % checks for potential
+            indRho = reshape(strcmp(BC.N.varName, '\rho'),1,1,size(FF,3));
             indNorm = reshape(strcmp(BC.(DIR).varType, 'v1'),1,1,size(FF,3));
             if GR.isPolar
-                BC_vals = FF(1,:,:);%.*(~indPhi + indPhi.*GR.RR_S(1,:)./GR.RR_N(1,:))
+                BC_vals = FF(1,:,:).*(indScalar + indPhi + indTan./(1-0.5.*GR.dR./GR.r_cyl) - indNorm)...
+                            + 2.*FF(1,:,indScalar).*reshape(BC.(DIR).dydx,1,size(FF,2)).*indNorm;%.*(~indPhi + indPhi.*GR.RR_S(1,:)./GR.RR_N(1,:))
 %                 BC_vals = FF(2,:,:);
             else
-                BC_vals = (  FF(1,:,:)... .*(indTan+indScalar)...
-                            - GR.dy.*reshape(BC.(DIR).dydx,1,size(FF,2)).*indPhi);... - FF(1,:,:);
+                BC_vals = (  FF(1,:,:).*(indTan+indScalar+indPhi-indNorm)...
+                            - GR.dy.*reshape(BC.(DIR).dydx,1,size(FF,2)).*indPhi...
+                            + 2.*FF(1,:,indRho).*reshape(BC.(DIR).dydx,1,size(FF,2)).*indNorm);... - FF(1,:,:);
             end
     end
 end

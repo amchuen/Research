@@ -6,16 +6,14 @@ clear;
 GR.isPolar = 1;
 
 % Define Grid
-GR.dT = 3*pi/180;
-GR.dR = 0.133;
-% GR.dT = 0.025*pi;
-% GR.dR = 0.05;
+GR.dT = 3.*pi/180*0.5;
+GR.dR = 0.133*0.25*0.5;
 
 % Field Axis Values
-R_max = 50;%GR.dR.*30+0.5;
+R_max = 15;%GR.dR.*30+0.5;
 r_cyl = 0.5;
 T_max = pi;
-T_min = 0*pi; %(-19*dx);
+T_min = 0.5*pi; %(-19*dx);
 T_vals = T_min:GR.dT:T_max;
 R_vals = (r_cyl+0.5*GR.dR):GR.dR:R_max;
 [GR.TT, GR.RR] = meshgrid(T_vals, R_vals);
@@ -32,18 +30,18 @@ GR.YY = GR.RR.*sin(GR.TT);
 %% FL - fluid parameters
 FL.gam = 1.4; % heat 
 % FL.M0 = 1.1;
-FL.M0 = 0.51;
+FL.M0 = 1.4;
 
 %% Simulation control, including tolerances, viscous factor gain, etc.
 
-GR.tol = 1e-5;
+GR.tol = 1e-4;
 GR.tEnd = 0.2; % 10 seconds maximum?
-GR.dt = 5e-5;
+GR.dt = 0.1;
 GR.CFL = 1;
 
 %% Diffusion Coefficients
 
-epsFunc = @(GR, BC, DIR) 0.0525;
+epsFunc = @(GR, BC, DIR) 0.0075;
 
 %% Boundary Conditions
 
@@ -56,13 +54,15 @@ epsFunc = @(GR, BC, DIR) 0.0525;
 
 % Far-field... need to update this?
 BC.N.physical = 'inlet';
-BC.N.val = {1, (1 - (r_cyl^2)./((GR.RR(end,:)+GR.dR).^2)).*cos(GR.TT(end,:)), -(1+(r_cyl^2)./((GR.RR(end,:)+GR.dR).^2)).*sin(GR.TT(end,:))};
+BC.N.val = {1,...
+            (1 - (r_cyl^2)./((GR.RR(end,:)+GR.dR).^2)).*cos(GR.TT(end,:)),...
+            -(1+(r_cyl^2)./((GR.RR(end,:)+GR.dR).^2)).*sin(GR.TT(end,:))};
 BC.N.varType = {'s','v1', 'v2'};
 BC.N.varName = {'\rho', '\rho u_r', '\rho v_\theta'};
 BC.N.dydx = 0;
 
 % Outlet
-BC.W.physical = 'sym';
+BC.W.physical = 'outlet';
 % BC.W.physical = 'outlet';
 BC.W.varType = BC.N.varType;
 BC.W.val = GR.XX(:,1);

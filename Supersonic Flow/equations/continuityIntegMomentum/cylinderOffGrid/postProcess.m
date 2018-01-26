@@ -1,4 +1,4 @@
-function postProcess(GR, BC, OUT, dirName)
+function OUT = postProcess(GR, BC, OUT, dirName)
 
 if ~exist(dirName, 'dir')
     mkdir(dirName);
@@ -13,7 +13,7 @@ saveas(gcf, [dirName, 'residual'],'pdf');
 saveas(gcf, [dirName, 'residual']);
 
 figure();
-contourf(GR.XX, GR.YY, OUT.Uvals(:,:,2,end));axis equal;
+contourf(GR.XX, GR.YY, OUT.Uvals(:,:,2,end), 200);axis equal;
 title('Flow Potential, \phi');
 xlabel('X');
 ylabel('Y');
@@ -49,10 +49,28 @@ end
 
 phi2 = 0.5.*(phi2_w + phi2_e);
 phi1 = 0.5.*(phi1_n + phi1_s);
+OUT.phi2 = phi2;
+OUT.phi1 = phi1;
+
+figure();contourf(GR.XX, GR.YY, phi1, 50);
+axis equal;
+title('V1');
+colorbar;
+saveas(gcf, [dirName 'v1_contour'],'pdf');
+saveas(gcf, [dirName 'v1_contour']);
+
+figure();contourf(GR.XX, GR.YY, phi2, 50);
+axis equal;
+title('V2');
+colorbar;
+saveas(gcf, [dirName 'v2_contour'],'pdf');
+saveas(gcf, [dirName 'v2_contour']);
+
 cpVals = 1-(phi2.^2 + phi1.^2);
+OUT.cpVals = cpVals;
 figure();contourf(GR.XX, GR.YY, cpVals, 50);
 axis equal;
-title('Coefficient of Pressure, U');
+title('Coefficient of Pressure');
 colorbar;
 saveas(gcf, [dirName 'cp_contour'],'pdf');
 saveas(gcf, [dirName 'cp_contour']);

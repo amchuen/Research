@@ -8,11 +8,11 @@ dx = 0.05;
 dy = 0.08;
 
 % Field Axis Values
-y_max = 50.*dy; %25;
-x_min = -20*dx;
-% x_max = 11;
-x_max = 39*dx; %(-19*dx);
-% x_min = -10;
+y_max = 50;%.*dy; %25;
+% x_min = -20*dx;
+x_max = 11;
+% x_max = 39*dx; %(-19*dx);
+x_min = -10;
 x_vals = x_min:dx:x_max;
 y_vals = 0:dy:y_max;
 [GR.XX, GR.YY] = meshgrid(x_vals, y_vals);
@@ -21,7 +21,7 @@ GR.dy = dy;
 
 %% FL - fluid parameters
 FL.gam = 1.4; % heat 
-FL.M0 = 1.1;
+FL.M0 = 0.98;
 
 %% Simulation control, including tolerances, viscous factor gain, etc.
 
@@ -37,10 +37,11 @@ epsFunc = @(GR, BC, DIR) 0.005;
 %% Boundary Conditions
 
 % % Body Values - Ramp
-tau = 0.05;
+tau = 0.1;
 m_x = tand(8); % dy/dx
 % x_vals = x_vals;
 % dx = dx;
+% Biconvex
 YY_B = [zeros(size(x_vals(x_vals <0))), ...
         2*tau.*x_vals((x_vals>=0)&(x_vals <=1)).*(1- x_vals((x_vals>=0)&(x_vals <=1))),...
         zeros(size(x_vals(x_vals >1)))];
@@ -50,6 +51,16 @@ for i = 2:(length(YY_B)-1)
    dyBdx(i) = (YY_B(i+1) - YY_B(i-1))/(2*dx);
 end
 
+% Diamond Airfoil
+YY_D = [zeros(size(x_vals(x_vals <0))), ...
+        tau.*x_vals((x_vals>=0)&(x_vals <0.5)),...
+        tau.*(1- x_vals((x_vals>=0.5)&(x_vals <=1))),...
+        zeros(size(x_vals(x_vals >1)))];
+dyDdx = zeros(size(YY_D));
+
+for i = 2:(length(YY_D)-1)
+   dyDdx(i) = (YY_D(i+1) - YY_D(i-1))/(2*dx);
+end
 % BC.(DIR) contains...
     % - physical type (e.g. wall, inlet, outlet, etc.)
     % - values

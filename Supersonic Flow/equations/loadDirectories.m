@@ -1,7 +1,11 @@
-function loadDirectories(eqnDir)
+function loadDirectories(varargin)
 
+if ~isempty(varargin) && length(varargin)>1
+    wdir = [pwd '/' varargin{2}];
+else
+    wdir = pwd;
+end
 folderNames = {'boundary', 'postProcess','solvers','visc','equations'};
-wdir = [pwd '/' eqnDir];
 
 cd ../
 for i = 1:length(folderNames)
@@ -9,5 +13,10 @@ for i = 1:length(folderNames)
 end
 
 cd(wdir)
+if ~isempty(varargin)
+    for i = 1:length(varargin{1})
+        addpath([pwd '/' varargin{1}{i}]);
+    end
+end
 
 end

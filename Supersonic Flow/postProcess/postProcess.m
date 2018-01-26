@@ -30,16 +30,21 @@ for i = 1:size(OUT.Uvals,3)
         saveas(gcf, [dirName, 'potential'],'pdf');
         saveas(gcf, [dirName, 'potential']);
         
-        plotCPpotetial(GR,BC, OUT.Uvals(:,:,:,end));
+%         plotCPpotential(GR,BC, OUT.Uvals(:,:,:,end));
     elseif strcmp(BC.N.varType{i}, 's')    
         figure();
         contourf(GR.XX, GR.YY, OUT.Uvals(:,:,i,end),50);axis equal;
-        title('Density, \rho');
+        title(BC.N.varName{i});
         xlabel('X');
         ylabel('Y');
         colorbar;
-        saveas(gcf, [dirName, 'density'],'pdf');
-        saveas(gcf, [dirName, 'density']);
+        if strcmp(BC.N.varName{i}, '\rho')
+            saveas(gcf, [dirName, 'density'],'pdf');
+            saveas(gcf, [dirName, 'density']);
+        else
+            saveas(gcf, [dirName, 'energy'],'pdf');
+            saveas(gcf, [dirName, 'energy']);
+        end
     
     elseif strcmp(BC.N.varType{i}, 'v1') || strcmp(BC.N.varType{i}, 'v2')
         
@@ -127,7 +132,8 @@ function plotCPpotential(FF, xstart, xend)
         saveas(gcf, [dirName 'cp_surf'],'pdf');
         saveas(gcf, [dirName 'cp_surf']);
     else
-        xx = GR.XX(1,2:end-1);
+%         xx = GR.XX(1,2:end-1);
+        xx = GR.XX(1,:);
         plot(xx(xx>-2 & xx < 2), cpVals(1,xx>-2 & xx < 2));
         set(gca,'YDir', 'Reverse');
         title('Surface Pressure Coefficient');
@@ -141,7 +147,7 @@ function plotCPeuler(FF,xstart, xend)
     DIR = 'N';
     indTan = reshape(strcmp(BC.(DIR).varType, 'v2'),1,1,size(FF,3));
     indNorm = reshape(strcmp(BC.(DIR).varType, 'v1'),1,1,size(FF,3));
-    indRho = reshape(strcmp(BC.(DIR).varType, 's'),1,1,size(FF,3));
+    indRho = reshape(strcmp(BC.(DIR).varName, '\rho'),1,1,size(FF,3));
     cpVals = 1 - (FF(:,:,indTan)./FF(:,:,indRho)).^2 - (FF(:,:,indNorm)./FF(:,:,indRho)).^2;
     figure();contourf(GR.XX, GR.YY, cpVals, 50);
     axis equal;

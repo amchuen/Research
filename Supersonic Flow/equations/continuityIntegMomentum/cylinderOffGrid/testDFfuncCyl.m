@@ -6,12 +6,13 @@ clear;
 GR.isPolar = 1;
 
 % Define Grid
-GR.dT = 3*pi/180;
-GR.dR = 0.133;
+GR.dT = 3.*pi/180*0.5;
+GR.dR = 0.133*0.25*0.5;
 
 % Field Axis Values
-R_max = 50;%GR.dR.*30+0.5;
+R_max = 15;%GR.dR.*30+0.5;
 r_cyl = 0.5;
+GR.r_cyl = r_cyl;
 T_max = pi;
 T_min = 0.5*pi; %(-19*dx);
 T_vals = T_min:GR.dT:T_max;
@@ -26,20 +27,22 @@ GR.YY = GR.RR.*sin(GR.TT);
 % GR.dx = dx;
 % GR.dy = dy;
 
+% figure();plot(GR.XX, GR.YY, 'b-', GR.XX', GR.YY', 'b-');axis equal
+
 %% FL - fluid parameters
 FL.gam = 1.4; % heat 
 FL.M0 = 1.4;
 
 %% Simulation control, including tolerances, viscous factor gain, etc.
 
-GR.tol = 1e-5;
+GR.tol = 1e-3;
 GR.tEnd = 0.2; % 10 seconds maximum?
-GR.dt = 5e-5;
-GR.CFL = 0.75;
+GR.dt = 1e-4;
+GR.CFL = 0.5;
 
 %% Diffusion Coefficients
 
-epsFunc = @(GR, BC, DIR) 0.05;
+epsFunc = @(GR, BC, DIR) 0.005;
 
 %% Boundary Conditions
 
@@ -57,6 +60,7 @@ BC.N.physical = 'farfield';
 % BC.N.val = {1, (GR.RR(end,:)+GR.dR + (r_cyl^2)./(GR.RR(end,:)+GR.dR)).*cos(GR.TT(end,:))};
 BC.N.val = {1, (1 - (r_cyl^2)./((GR.RR(end,:)).^2)).*cos(GR.TT(end,:))};
 BC.N.varType = {'s','phi'};
+BC.N.varName = {'\rho','\phi'};
 BC.N.dydx = 0;
 
 % Sym
@@ -82,17 +86,19 @@ BC.W.varType = BC.N.varType;
 %% Run Simulation
 
 U0 = cat(3, ones(size(GR.XX)), (GR.RR + (r_cyl^2)./(GR.RR)).*cos(GR.TT));
-
+% load('cylinder\M_1.1\testGrid2\OUT.mat','OUT');
+% U0 = OUT.Uvals(:,:,:,end);
+% clear OUT
 OUT = dufortFrankel(GR, FL, BC, @CIPMcyl, epsFunc, U0);
 
 %% Post Process
 close all;
 
 folderName = ['M_' num2str(FL.M0)];
-dirName = [pwd '\cylinder\' folderName '\'];
+dirName = [pwd '\cylinder\' folderName '\test4\'];
 % if ~exist(dirName, 'dir')
 %     mkdir(dirName);
 % end
 
-postProcess(GR, BC, OUT, dirName);
+OUT = postProcess(GR, BC, OUT, dirName);
 save([dirName 'OUT']);

@@ -95,19 +95,19 @@ while norm(res(end,:)) > GR.tol || time(end) < GR.tEnd
     
     if (length(res) >= 500) && (mod(length(res), 500) == 0)
         fprintf('Iteration Ct: %i\n', length(res));
-        fprintf('Current Residual: %0.5e\n', res(end));
+        fprintf('Current Residual: %0.5e\n', norm(res(end,:)));
     end
     
     figure(1);
-%     for iii = 1:size(res,2)
-%         semilogy(time, res(:,iii));
-%         hold on;
-%     end
-%     legend(BC.N.varName, 'Location', 'Best');
-    contourf(GR.XX, GR.YY, UU.fv(:,:,1,end),50);
+    for iii = 1:size(res,2)
+        semilogy(1:size(res,1), res(:,iii));
+        hold on;
+    end
+    legend(BC.N.varName, 'Location', 'Best');
+%     contourf(GR.XX, GR.YY, UU.fv(:,:,1,end),50); axis equal;
     title(['t = ' num2str(time(end))]);
     hold off;
-    colorbar;
+%     colorbar;
     drawnow;
     
 end
@@ -142,7 +142,7 @@ function res = resCalc(GR, Uvals)
 
 % checks steady state by calculateing Ut?
 for i = 1:size(Uvals,3)
-    tempres = abs(Uvals(:,:,i,end) - Uvals(:,:,i,end-1));%./GR.dt;
+    tempres = abs(Uvals(:,:,i,end) - Uvals(:,:,i,end-1))./GR.dt;
     res(i) = max(tempres(:));
 end
 

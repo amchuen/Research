@@ -19,10 +19,12 @@ FF = EE.*EE(:,:,indP2)./EE(:,:,indRho);% + indP2.*PP;
 GG = EE.*EE(:,:,indP1)./EE(:,:,indRho);% + indP1.*PP;
 
 if GR.isPolar
+    GG = GG.*GR.RR;
     %FF = FF + indP2.*PP;
     % radial derivatives must calculate pressure and vel. separately!
-    GG_1 =  (GR.RR_N.*[GG(2:end,:,:);bcN] - GR.RR_S.*[bcS;GG(1:end-1,:,:)])./(2.*GR.dR.*GR.RR); ... % vector Flux
-    PP_1 =  ([indP1.*PP(2:end,:);bcNP] - [bcSP;indP1.*PP(1:end-1,:)])./(2*GR.dR);...Pressure Term
+    GG_1 =  ([GG(2:end,:,:);(GR.RR(end,:)+GR.dR).*bcN] - [(GR.RR(1,:)-0.5.*GR.dR).*bcS;GG(1:end-1,:,:)])./(2.*GR.dR.*GR.RR); ... % vector Flux
+%     PP_1 =  ([indP1.*PP(2:end,:);bcNP] - [bcSP;indP1.*PP(1:end-1,:)])./(2*GR.dR);...Pressure Term
+    PP_1 =  ([indP1.*PP(2:end,:);bcNP] - [indP1.*(PP(1,:) - GR.dR.*FF(1,:,indP2)./GR.r_cyl);indP1.*PP(1:end-1,:)])./(2*GR.dR);...Pressure Term
     C_1 =  -indP1.*(EE(:,:,indP2).^2)./(GR.RR.*EE(:,:,indRho)); ... Centrifugal Term
 %     FF_2 =  ([FF(:,2:end,:),bcE+bcEP] - [bcW+bcWP,FF(:,1:end-1,:)])./(2.*GR.dT.*GR.RR)...
     FF_2 =  ([FF(:,2:end,:),bcE] - [bcW,FF(:,1:end-1,:)])./(2.*GR.dT.*GR.RR);...
