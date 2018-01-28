@@ -1,4 +1,4 @@
-function postProcess(GR, BC, FL, OUT, dirName)
+function OUT = postProcess(GR, BC, OUT, dirName)
 
 if ~exist(dirName, 'dir')
     mkdir(dirName);
