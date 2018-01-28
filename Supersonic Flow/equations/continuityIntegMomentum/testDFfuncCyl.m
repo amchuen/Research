@@ -30,7 +30,7 @@ GR.YY = GR.RR.*sin(GR.TT);
 % figure();plot(GR.XX, GR.YY, 'b-', GR.XX', GR.YY', 'b-');axis equal
 
 %% FL - fluid parameters
-FL.gam = 1.4; % heat 
+FL.gam = 2; % heat 
 FL.M0 = 1.4;
 
 %% Simulation control, including tolerances, viscous factor gain, etc.
@@ -38,11 +38,11 @@ FL.M0 = 1.4;
 GR.tol = 1e-3;
 GR.tEnd = 0.2; % 10 seconds maximum?
 GR.dt = 1e-4;
-GR.CFL = 0.5;
+GR.CFL = 0.25;
 
 %% Diffusion Coefficients
 
-epsFunc = @(GR, BC, DIR) 0.005;
+epsFunc = @(GR, BC, DIR) 0.01;
 
 %% Boundary Conditions
 
@@ -89,13 +89,13 @@ U0 = cat(3, ones(size(GR.XX)), (GR.RR + (r_cyl^2)./(GR.RR)).*cos(GR.TT));
 % load('cylinder\M_1.1\testGrid2\OUT.mat','OUT');
 % U0 = OUT.Uvals(:,:,:,end);
 % clear OUT
-OUT = dufortFrankel(GR, FL, BC, @CIPMcyl, epsFunc, U0);
+OUT = dufortFrankel(GR, FL, BC, @fullPotential, epsFunc, U0);
 
 %% Post Process
 close all;
 
 folderName = ['M_' num2str(FL.M0)];
-dirName = [pwd '\cylinder\' folderName '\test4\'];
+dirName = [pwd '\cylinder\' folderName '\test5\'];
 % if ~exist(dirName, 'dir')
 %     mkdir(dirName);
 % end

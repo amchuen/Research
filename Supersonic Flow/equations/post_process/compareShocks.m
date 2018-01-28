@@ -10,7 +10,7 @@ euler = load('eulerIsen.mat','OUT', 'GR');
 %% Plot Bow Shocks on X-axis
 
 figure();
-xMax = -3;
+xMax = -6;
 xRangePot = potential.GR.XX(:,end)>=xMax;
 xRangeEul = euler.GR.XX(:,end)>=xMax;
 plot(potential.GR.XX(xRangePot,end),potential.OUT.Uvals(xRangePot,end,1,end));
@@ -26,7 +26,7 @@ saveas(gcf, 'density_shock', 'pdf');
 
 %% Plot Contour Fields
 figure();
-contourf(potential.GR.XX, potential.GR.YY, potential.OUT.Uvals(:,:,1,end), 50);
+contourf(potential.GR.XX, potential.GR.YY, potential.OUT.Uvals(:,:,1,end), 10);
 axis equal;
 title('Density Field - Potential Flow');
 colorbar;

@@ -25,7 +25,7 @@ time = [-GR.dt, 0];
 indV1 = reshape(strcmp(BC.N.varType, 'v1'),1,1,size(UU.fv,3));
 indV2 = reshape(strcmp(BC.N.varType, 'v2'),1,1,size(UU.fv,3));
 
-while norm(res(end,:)) > GR.tol || time(end) < GR.tEnd
+while norm(res(end,:)./max(res)) > GR.tol || time(end) < GR.tEnd
     
     % Step-Forward
     UU.fv(:,:,:,1:2) = UU.fv(:,:,:,2:3);
@@ -71,10 +71,14 @@ while norm(res(end,:)) > GR.tol || time(end) < GR.tEnd
         
         % Calculate Vector Laplacian Terms
 %         indRho = reshape(strcmp(BC.N.varType, 's'),1,1,size(UU.fv,3)); 
-        rotLaplace =- indV1.*(UU.fv(:,:,indV1,2) +...
+        if any(indV1) || any(indV2)
+            rotLaplace =- indV1.*(UU.fv(:,:,indV1,2) +...
                                 2.*([UU.fv(:,2:end,indV2,2),bcCalc(GR,BC,UU.fv(:,:,:,2),'E',find(indV2))] - [bcCalc(GR,BC,UU.fv(:,:,:,2),'W',find(indV2)),UU.fv(:,1:end-1,indV2,2)])./(2.*GR.dT))./(GR.RR.^2)...
                     - indV2.*(UU.fv(:,:,indV2,2) -...
                                 2.*([UU.fv(:,2:end,indV1,2),bcCalc(GR,BC,UU.fv(:,:,:,2),'E',find(indV1))] - [bcCalc(GR,BC,UU.fv(:,:,:,2),'W',find(indV1)),UU.fv(:,1:end-1,indV1,2)])./(2.*GR.dT))./(GR.RR.^2);
+        else
+            rotLaplace = 0;
+        end
         
         % Compute Time-step
         UU.fv(:,:,:,3) = ((1-alpha2-alpha1).*UU.fv(:,:,:,1)+alpha2.*(UU.f2)+alpha1.*(UU.f1)./(0.5.*(GR.RR_N+GR.RR_S))-(1+1/cflFactor).*GR.dt.*(funcOut - epsFunc(GR,BC,'X').*rotLaplace))./(1+alpha2+alpha1);
@@ -88,7 +92,7 @@ while norm(res(end,:)) > GR.tol || time(end) < GR.tEnd
     end
     
     % Calculate Residual
-    res(end+1,:) = resCalc(GR, UU.fv(:,:,:,end:-1:end-2));    
+    res(end+1,:) = resCalc(GR, UU.fv(:,:,:,end-1:end));    
     time(end+1) = time(end) + GR.dt;
     
     runChecks(UU.fv(:,:,:,end));

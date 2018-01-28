@@ -12,21 +12,20 @@ M0 = 1.4;
 % dT = 0.025*pi;
 % dr = 0.05;
 
-dT = pi/180;
-dr = 0.133;
+dT = 3.*pi/180*0.5;
 
 r_cyl = 0.5;
 
 % Field Axis Values - body fitted grid
 R_range=[   r_cyl+0.5*dr,... % r_cyl
-            50];
+            15];
 T_range=[   0.5*pi,...
             pi];
         
 %% CT - simulation control, including tolerances, viscous factor gain, etc.
-eps_s = 0.01;%75;%dr^2; % spatial diffusion term
+eps_s = 0.005;%75;%dr^2; % spatial diffusion term
 % eps_t = 0.005; % time diffusion term
-tol = 1e-4;
+tol = 1e-3;
 dt = 0.1;
 iter_min = 300;
 CFL_on = 1;
@@ -113,7 +112,7 @@ rr_s = repmat(0.5.*([2.*GR.RR(1,:)-dr; GR.RR(2:end,:) + GR.RR(1:(end-1),:)]),1,1
 RR = repmat(GR.RR, 1,1,3);
 alpha = cat(3, zeros(size(GR.RR)), 1./(RR(:,:,2:3).^2));
 DF_coeff = ((rr_n + rr_s)./(dr^2 .* RR) + 2./(RR.^2 .* dT^2) + alpha);
-while  norm(res(end, :)) > tol|| (size(res,1) < iter_min) % iterate through time
+while  norm(res(end, :)./max(res)) > tol|| (size(res,1) < iter_min) % iterate through time
     
     %% Update
     EE.fv(:,:,:,1:2) = EE.fv(:,:,:,2:3);
@@ -254,20 +253,20 @@ while  norm(res(end, :)) > tol|| (size(res,1) < iter_min) % iterate through time
     test = abs(EE.fv(:,:,:,3) - EE.fv(:,:,:,2));
     
     if (size(res,1) == 1) && all(res(end,:) == 0)
-        res(1, :) = [max(R_err(:)), max(A_err(:)), max(B_err(:))]; 
+        res(1, :) = [max(R_err(:)), max(A_err(:)), max(B_err(:))]./dt; 
     else
-        res(end+1, :) = [max(R_err(:)), max(A_err(:)), max(B_err(:))];
+        res(end+1, :) = [max(R_err(:)), max(A_err(:)), max(B_err(:))]./dt;
     end
     
-    figure(1);contourf(GR.XX, GR.YY, EE.fv(:,:,1,end),50); axis equal;
-    colorbar;
+%     figure(1);contourf(GR.XX, GR.YY, EE.fv(:,:,1,end),50); axis equal;
+%     colorbar;
 
-%     figure(1);semilogy(1:size(res,1), res(:,1));
+    figure(1);semilogy(1:length(res), res);
 %     hold on;
 %     semilogy(1:size(res,1), res(:,2));
 %     semilogy(1:size(res,1), res(:,3));
 %     hold off;
-%     legend('Density', '\rho u', '\rho v', 'Location' ,'bestoutside');
+    legend('Density', '\rho u', '\rho v', 'Location' ,'bestoutside');
     drawnow;
     if (size(res, 1) > 500) && (mod(size(res, 1), 2000) == 0)
         fprintf('Iteration Ct: %i\n', size(res, 1));

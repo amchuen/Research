@@ -10,7 +10,7 @@ GR.dT = 3.*pi/180*0.5;
 GR.dR = 0.133*0.25*0.5;
 
 % Field Axis Values
-R_max = 15;%GR.dR.*30+0.5;
+R_max = 25;%GR.dR.*30+0.5;
 r_cyl = 0.5;
 T_max = pi;
 T_min = 0.5*pi; %(-19*dx);
@@ -28,7 +28,7 @@ GR.YY = GR.RR.*sin(GR.TT);
 % GR.dy = dy;
 
 %% FL - fluid parameters
-FL.gam = 1.4; % heat 
+FL.gam = 2; % heat 
 % FL.M0 = 1.1;
 FL.M0 = 1.4;
 
@@ -41,7 +41,7 @@ GR.CFL = 1;
 
 %% Diffusion Coefficients
 
-epsFunc = @(GR, BC, DIR) 0.0075;
+epsFunc = @(GR, BC, DIR) 0.01;
 
 %% Boundary Conditions
 
