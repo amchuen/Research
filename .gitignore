@@ -82,3 +82,10 @@ Supersonic Flow/Report/abstract/AbstractTemplateICCFD10Tex/AbstractTemplateICCFD
 Supersonic Flow/Report/abstract/AbstractTemplateICCFD10Tex/AbstractTemplateICCFD10.aux
 *.tex
 Supersonic Flow/Report/abstract/AbstractTemplateICCFD10Tex/AbstractTemplateICCFD10.tex
+Supersonic Flow/equations/continuityIntegMomentum/scheme_prototyping/tsf_euler_cyl.m
+Supersonic Flow/equations/continuityIntegMomentum/scheme_prototyping/tsf_euler.m
+Supersonic Flow/equations/continuityIntegMomentum/scheme_prototyping/euler_test_tt.m
+Supersonic Flow/equations/continuityIntegMomentum/scheme_prototyping/euler_test.m
+Supersonic Flow/equations/continuityIntegMomentum/scheme_prototyping/cartCaseRun.m
+Supersonic Flow/equations/continuityIntegMomentum/scheme_prototyping/euler_polar.m
+Supersonic Flow/equations/continuityIntegMomentum/scheme_prototyping/euler_test_tavg.m

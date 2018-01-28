@@ -1,4 +1,4 @@
-function [fvOUT, waveSpd] = CIPMcyl(GR, FL, BC, FF)
+function [fvOUT, waveSpd] = fullPotential(GR, FL, BC, FF)
 
 fvOUT = zeros(size(FF));
 
