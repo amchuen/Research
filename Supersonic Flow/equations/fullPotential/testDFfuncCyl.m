@@ -10,7 +10,7 @@ GR.dT = 3.*pi/180*0.5;
 GR.dR = 0.133*0.25*0.5;
 
 % Field Axis Values
-R_max = 15;%GR.dR.*30+0.5;
+R_max = 25;%GR.dR.*30+0.5;
 r_cyl = 0.5;
 GR.r_cyl = r_cyl;
 T_max = pi;

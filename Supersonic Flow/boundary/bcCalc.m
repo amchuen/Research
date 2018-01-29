@@ -110,7 +110,7 @@ function BC_vals = gen_outletBC(GR, BC, FF, DIR)
             indTan = reshape(strcmp(BC.(DIR).varType, 'v1'),1,1,size(FF,3)) + reshape(strcmp(BC.(DIR).varType, 'v2'),1,1,size(FF,3)) + reshape(strcmp(BC.(DIR).varType, 's'),1,1,size(FF,3));
             indPhi = reshape(strcmp(BC.(DIR).varType, 'phi'),1,1,size(FF,3)); % checks for potential
             BC_vals = FF(:,1,:).*indTan + (2.*FF(:,1,:) - FF(:,2,:)).*indPhi;
-%             BC_vals = (4/3.*FF(:,1,:) - 1/3.*FF(:,2,:)).*indTan + (2.*FF(:,1,:) - FF(:,2,:)).*indPhi;
+%             BC_vals = (4/3.*FF(:,1,:) - 1/3.*FF(:,2,:)).*indTan + (5./2.*FF(:,1,:) - 2.*FF(:,2,:)+0.5.*FF(:,3,:)).*indPhi;
 %             BC_vals = FF(:,1,:);
 
         case 'E' 
