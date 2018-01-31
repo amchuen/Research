@@ -1,4 +1,4 @@
-function OUT = postProcess(GR, BC, OUT, dirName)
+function OUT = postProcess(GR, BC, FL, OUT, dirName)
 
 if ~exist(dirName, 'dir')
     mkdir(dirName);
@@ -66,9 +66,9 @@ for i = 1:size(OUT.Uvals,3)
 end
 
 if any(strcmp(BC.N.varType,'phi'))
-    plotCPpotential(OUT.Uvals(:,:,:,end), -10, 10);
+    plotCPpotential(OUT.Uvals(:,:,:,end), -30, 10);
 elseif any(strcmpi(BC.N.varType, 'v1')) || any(strcmpi(BC.N.varType, 'v2'))
-    plotCPeuler(OUT.Uvals(:,:,:,end), -10, 10);
+    plotCPeuler(OUT.Uvals(:,:,:,end), -30, 10);
 end
     
 
