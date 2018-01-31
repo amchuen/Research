@@ -7,10 +7,10 @@ GR.isPolar = 1;
 
 % Define Grid
 GR.dT = 3.*pi/180*0.5;
-GR.dR = 0.133*0.25*0.5;
+GR.dR = 0.133;
 
 % Field Axis Values
-R_max = 25;%GR.dR.*30+0.5;
+R_max = 75;%GR.dR.*30+0.5;
 r_cyl = 0.5;
 T_max = pi;
 T_min = 0.5*pi; %(-19*dx);
@@ -28,9 +28,9 @@ GR.YY = GR.RR.*sin(GR.TT);
 % GR.dy = dy;
 
 %% FL - fluid parameters
-FL.gam = 2; % heat 
+FL.gam = 1.4; % heat 
 % FL.M0 = 1.1;
-FL.M0 = 1.4;
+FL.M0 = 1.1;
 
 %% Simulation control, including tolerances, viscous factor gain, etc.
 
@@ -41,7 +41,7 @@ GR.CFL = 1;
 
 %% Diffusion Coefficients
 
-epsFunc = @(GR, BC, DIR) 0.01;
+epsFunc = @(GR, BC, DIR) 0.005;
 
 %% Boundary Conditions
 
@@ -94,10 +94,10 @@ BC.N.varName = {'\rho', '\rho u', '\rho v'};
 
 geomName = 'cylinder';
 folderName = ['M_' num2str(FL.M0)];
-dirName = [pwd '\' geomName '\' folderName '\'];
+dirName = [pwd '\' geomName '\' folderName '\g14\'];
 % if ~exist(dirName, 'dir')
 %     mkdir(dirName);
 % end
 
-postProcess(GR, BC, FL, OUT, dirName);
+OUT = postProcess(GR, BC, FL, OUT, dirName);
 save([dirName 'OUT']);

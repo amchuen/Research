@@ -6,11 +6,14 @@ clear;
 GR.isPolar = 1;
 
 % Define Grid
-GR.dT = 3.*pi/180*0.5;
-GR.dR = 0.133*0.25*0.5;
+% GR.dT = 3.*pi/180*0.5;
+% GR.dR = 0.133*0.25*0.5;
+
+GR.dT = pi/180;
+GR.dR = 0.133*0.5;
 
 % Field Axis Values
-R_max = 15;%GR.dR.*30+0.5;
+R_max = 50;%GR.dR.*30+0.5;
 r_cyl = 0.5;
 GR.r_cyl = r_cyl;
 T_max = pi;
@@ -30,8 +33,8 @@ GR.YY = GR.RR.*sin(GR.TT);
 % figure();plot(GR.XX, GR.YY, 'b-', GR.XX', GR.YY', 'b-');axis equal
 
 %% FL - fluid parameters
-FL.gam = 2; % heat 
-FL.M0 = 1.4;
+FL.gam = 1.4; % heat 
+FL.M0 = 1.1;
 
 %% Simulation control, including tolerances, viscous factor gain, etc.
 
