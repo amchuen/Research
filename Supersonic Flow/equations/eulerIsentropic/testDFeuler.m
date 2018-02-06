@@ -4,13 +4,13 @@ clear;
 
 %% GR - grid information, such as the meshfield, grid spacing (dx, dy, etc.)
 % Define Grid
-dx = 0.04;
 dy = 0.04;
+dx = 0.04;
 
 % Field Axis Values
-y_max = 50;
-x_max = 11;%7+20*dx;
-x_min = -10;%-7-39*dx; %(-19*dx);
+y_max = 30;
+x_max = 6;%7+20*dx;
+x_min = -3;%-7-39*dx; %(-19*dx);
 x_vals = x_min:dx:x_max;
 y_vals = 0:dy:y_max;
 [GR.XX, GR.YY] = meshgrid(x_vals, y_vals);
@@ -20,7 +20,7 @@ GR.isPolar = 0;
 
 %% FL - fluid parameters
 FL.gam = 1.4; % heat 
-FL.M0 = 0.85;
+FL.M0 = 1.4;
 
 %% Simulation control, including tolerances, viscous factor gain, etc.
 
@@ -31,7 +31,7 @@ GR.CFL = 1;
 
 %% Diffusion Coefficients
 
-epsFunc = @(GR, BC, DIR) 0.005;
+% epsFunc = @(FF, GR, BC, DIR) varVisc;
 
 %% Boundary Conditions
 
@@ -82,7 +82,7 @@ BC.E.varType = BC.N.varType;
 
 U0 = cat(3,repmat(ones(size(GR.XX)),1,1,2), zeros(size(GR.XX)));%cat(3, ones(size(GR.XX)), GR.XX);
 
-OUT = dufortFrankel(GR, FL, BC, @eulerIsenFunc, epsFunc, U0);
+OUT = dufortFrankel(GR, FL, BC, @eulerIsenFunc, @vonNeumRichtVisc, U0);
 
 %% Post Process
 close all;
@@ -90,7 +90,7 @@ close all;
 BC.N.varName = {'\rho', '\rho u', '\rho v'};
 
 
-geomName = 'biconvex';
+geomName = 'biconvex_varVisc';
 folderName = ['M_' num2str(FL.M0)];
 dirName = [pwd '\' geomName '\' folderName '\'];
 % if ~exist(dirName, 'dir')

@@ -19,51 +19,63 @@ UU = struct('fv',repmat(U0,1,1,1,3),'f2',zeros(size(U0)), 'f1', zeros(size(U0)))
 
 % Calculate Residual before running simulation
 res = ones(2,size(UU.fv,3)); %resCalc(GR, FL, BC, func, epsFunc, UU.fv(:,:,:,end));
+maxRes = max(res,[],1);
 time = [-GR.dt, 0];
 
 %% Run Simulation
 indV1 = reshape(strcmp(BC.N.varType, 'v1'),1,1,size(UU.fv,3));
 indV2 = reshape(strcmp(BC.N.varType, 'v2'),1,1,size(UU.fv,3));
-
-while norm(res(end,:)./max(res)) > GR.tol || time(end) < GR.tEnd
+dtLast = GR.dt;
+while norm(res(end,:)./maxRes) > GR.tol || time(end) < GR.tEnd
     
     % Step-Forward
     UU.fv(:,:,:,1:2) = UU.fv(:,:,:,2:3);
+    
+    % Calculate Viscosities
+    [epsN, epsS, epsE, epsW] = epsFunc(UU.fv(:,:,:,2), GR, BC);
+%     epsS = epsFunc(UU.fv(:,:,:,2), GR, BC, 'S');
+%     epsW = epsFunc(UU.fv(:,:,:,2), GR, BC, 'W');
+%     epsE = epsFunc(UU.fv(:,:,:,2), GR, BC, 'E');
     
     % Define stability coefficients
     if GR.isPolar
         alpha2 = 2.*GR.dt.*epsFunc(GR,BC,'T')./(GR.RR.*GR.dT).^2;
         alpha1 = 2.*GR.dt.*epsFunc(GR,BC,'R')./(GR.RR.*GR.dR.^2).*0.5.*(GR.RR_N+GR.RR_S);
     else
-        alpha2 = 2.*GR.dt.*epsFunc(GR, BC, 'X')./(GR.dx.^2);
-        alpha1 = 2.*GR.dt.*epsFunc(GR, BC, 'Y')./(GR.dy.^2);
+%         alphaW = 2.*GR.dt.*epsFunc(UU.fv(:,:,:,2), GR, BC, 'W')./(GR.dx);
+%         alphaE = 2.*GR.dt.*epsFunc(UU.fv(:,:,:,2), GR, BC, 'E')./(GR.dx);
+        alpha2 = GR.dt.*(epsW + epsE)./(GR.dx.^2);
+        alpha1 = GR.dt.*(epsN + epsS)./(GR.dy.^2);
     end
     alphaTot = alpha2 + alpha1;
     
     % Calculate non-diffusive terms
     [funcOut, waveSpd] = func(GR, FL, BC, UU.fv(:,:,:,2));
-    alphaWave = 2.*(waveSpd(1)./(2.*epsFunc(GR, BC, 'X')) + waveSpd(2)./(2.*epsFunc(GR,BC,'Y')))*GR.dt;
+    alphaWave = 2.*(waveSpd(1)./max(max(epsE + epsW)) + waveSpd(2)./max(max(epsN + epsS)))*GR.dt;
+%     alphaWave = waveSpd(1).*GR.dt./GR.dx + waveSpd(2).*GR.dt./GR.dy;
     
     % Check CFL
     cflFactor = 1;
-    if (max(abs(alphaWave(:))) ~= GR.CFL) || (max(abs(alphaTot(:))) > GR.CFL) %-> DF method might allow for unconditional stability for pure diffusion
-        %cflFactor = GR.CFL./max(alphaTot(:));
-        cflFactor = min(GR.CFL./max(abs(alphaWave(:))), GR.CFL./max(abs(alphaTot(:))));
+    if (max(abs(alphaWave(:))) ~= GR.CFL)%(max(abs(alphaTot(:))) > GR.CFL) ||  ) % ((max(abs(alphaWave(:))) >= GR.CFL)||&& (max(abs(alphaTot(:))) > 0 && all(~isinf(alphaWave(:)))) % (max(abs(alphaTot(:))) ~= 0.5*GR.CFL) (max(abs(alphaWave(:))) ~= GR.CFL) ||  -> DF method might allow for unconditional stability for pure diffusion
+        cflFactor = GR.CFL./max(alphaWave(:));
+%         cflFactor = GR.CFL./max(abs(alphaTot(:)));
+%         cflFactor = min(GR.CFL./max(abs(alphaWave(:))), 0.5.*GR.CFL./max(abs(alphaTot(:))));
         alpha2 = alpha2 .* (1+cflFactor)./2;
         alpha1 = alpha1 .* (1+cflFactor)./2;
         GR.dt = GR.dt .* cflFactor;
         
-        if abs(log10(cflFactor)) > 0.005
+        if abs(log10(GR.dt/dtLast)) >= 0.5
             fprintf('CFL condition not met!\n');
             fprintf('Changing time steps!\n');
             fprintf('New time step:%0.5e\n', GR.dt);
+            dtLast = GR.dt;
         end
     end
     
     % Compute Center-Spacing Derivatives
-    UU.f2(:,2:end-1,:) = UU.fv(:,3:end,:,2) + UU.fv(:,1:end-2,:,2);
-    UU.f2(:,1,:) = UU.fv(:,2,:,2) + bcCalc(GR, BC, UU.fv(:,:,:,2), 'W');
-    UU.f2(:,end,:) = UU.fv(:,end-1,:,2) + bcCalc(GR, BC, UU.fv(:,:,:,2), 'E');
+    UU.f2 = epsE.*[UU.fv(:,2:end,:,2),bcCalc(GR, BC, UU.fv(:,:,:,2), 'E')]  + epsW.*[bcCalc(GR, BC, UU.fv(:,:,:,2), 'W'), UU.fv(:,1:end-1,:,2)];
+%     UU.f2(:,1,:) = UU.fv(:,2,:,2) + bcCalc(GR, BC, UU.fv(:,:,:,2), 'W');
+%     UU.f2(:,end,:) = UU.fv(:,end-1,:,2) + bcCalc(GR, BC, UU.fv(:,:,:,2), 'E');
     if GR.isPolar
         UU.f1(2:end-1,:,:) = GR.RR_N(2:end-1,:).*UU.fv(3:end,:,:,2) + GR.RR_S(2:end-1,:).*UU.fv(1:end-2,:,:,2);
         UU.f1(1,:,:) = GR.RR_N(1,:).*UU.fv(2,:,:,2) + GR.RR_S(1,:).*bcCalc(GR, BC, UU.fv(:,:,:,2),'S');
@@ -83,12 +95,13 @@ while norm(res(end,:)./max(res)) > GR.tol || time(end) < GR.tEnd
         % Compute Time-step
         UU.fv(:,:,:,3) = ((1-alpha2-alpha1).*UU.fv(:,:,:,1)+alpha2.*(UU.f2)+alpha1.*(UU.f1)./(0.5.*(GR.RR_N+GR.RR_S))-(1+1/cflFactor).*GR.dt.*(funcOut - epsFunc(GR,BC,'X').*rotLaplace))./(1+alpha2+alpha1);
     else
-        UU.f1(2:end-1,:,:) = UU.fv(3:end,:,:,2) + UU.fv(1:end-2,:,:,2);
-        UU.f1(1,:,:) = UU.fv(2,:,:,2) + bcCalc(GR, BC, UU.fv(:,:,:,2),'S');
-        UU.f1(end,:,:) = UU.fv(end-1,:,:,2) + bcCalc(GR,BC, UU.fv(:,:,:,2),'N');
+        UU.f1 = epsN.*[UU.fv(2:end,:,:,2); bcCalc(GR,BC, UU.fv(:,:,:,2),'N')] + epsS.*[bcCalc(GR, BC, UU.fv(:,:,:,2),'S'); UU.fv(1:end-1,:,:,2)];
+%         UU.f1(2:end-1,:,:) = UU.fv(3:end,:,:,2) + UU.fv(1:end-2,:,:,2);
+%         UU.f1(1,:,:) = UU.fv(2,:,:,2) + bcCalc(GR, BC, UU.fv(:,:,:,2),'S');
+%         UU.f1(end,:,:) = UU.fv(end-1,:,:,2) + bcCalc(GR,BC, UU.fv(:,:,:,2),'N');
         
         % Compute Time-step
-        UU.fv(:,:,:,3) = ((1-alpha2-alpha1).*UU.fv(:,:,:,1)+alpha2.*(UU.f2)+alpha1.*(UU.f1)-(1+1/cflFactor).*GR.dt.*funcOut)./(1+alpha2+alpha1);
+        UU.fv(:,:,:,3) = ((1-alpha2-alpha1).*UU.fv(:,:,:,1)+(1+1/cflFactor).*GR.dt.*(UU.f2./(GR.dx.^2)+UU.f1./(GR.dy.^2) - funcOut))./(1+alpha2+alpha1);
     end
     
     % Calculate Residual
@@ -113,6 +126,12 @@ while norm(res(end,:)./max(res)) > GR.tol || time(end) < GR.tEnd
     hold off;
 %     colorbar;
     drawnow;
+    
+    if size(res,1) < 5
+        maxRes = max(res, [], 1);
+    else
+        maxRes = max(res(1:5,:), [], 1);
+    end
     
 end
 
