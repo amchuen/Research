@@ -6,18 +6,17 @@ close all;
 
 % dx = 0.0025;
 % xx = (0:dx:1)';
-xx = linspace(0,1,401)';
+xx = linspace(0,1,1001);
 dx = xx(2) - xx(1);
-dt = 0.01;
-
-Ldx = diag([0, ones(1,length(xx)-2)./2.*dx],1) - diag([ones(1,length(xx)-2)./2.*dx, 0], -1);
-Ldx2 = diag([0, ones(1,length(xx)-2)./(dx.^2)],1) + diag([ones(1,length(xx)-2)./(dx.^2), 0], -1);
-Cdx2 = diag([0, ones(1,length(xx)-2)./(dx^2),0]);
+dt = 0.1;
 
 %% Fluid Properties
 gam = 1.4;
-visc = dx*0.007;
-cfl = 0.75;
+cfl = 0.95;
+
+flux =@(U) [ U(2,:,2);...
+            0.5.*(3-gam).*(U(2,:,2).^2) ./ U(1,:,2) + (gam-1).*U(3,:,2);...
+            -0.5.*(gam-1).*(U(2,:,2).^3)./(U(1,:,2).^2) + gam.*U(2,:,2).*U(3,:,2)./U(1,:,2)];
 
 %% Initialize Field Values
 
@@ -30,10 +29,9 @@ UU(1,:) = (xx<=0.5)+0.125.*(xx>0.5);
 UU(2,:) = 0; 
 
 %Energy
-PP = (xx<=0.5)+0.1.*(xx>0.5);
-UU(3,:) = PP'./(gam - 1) + 0.5.*UU(2,:).^2./UU(1,:);
+UU(3,:) = 2.5.*(xx<=0.5)+0.25.*(xx>0.5); 
 
-UU = repmat(UU',1,1,3);
+UU = repmat(UU,1,1,3);
 
 %% Setup Time Simulation
 time = 0;
@@ -41,56 +39,55 @@ tEnd = 10*5;
 
 %% Run Simulation
 
-while time(end) < tEnd
+while length(time) < 500
     
     % Update Field Values
     UU(:,:,1:2) = UU(:,:,2:3);
     
     % Update Flux
-    PP = (gam - 1).*(UU(:,3,2) - 0.5.*UU(:,2,2).^2./UU(:,1,2));
-    FF =  [ UU(:,2,2),...
-            UU(:,2,2).^2./UU(:,1,2)+ PP,...
-            (UU(:,3,2)+PP).*UU(:,2,2)./UU(:,1,2)];
+%     PP = (gam - 1).*(UU(:,3,2) - 0.5.*UU(:,2,2).^2./UU(:,1,2));
+    FF =  flux(UU);
     
-    % Check CFL
-    epsilon = visc.* abs((Ldx2 - 2.*Cdx2)*UU(:,1,2))./((Ldx2+2.*Cdx2)*UU(:,1,2));
-    epsilon = [0; epsilon(2:end-1); 0];
-    alphaL = 2.*dt.*epsilon.*Ldx2;
-    alphaC = 2.*dt.*epsilon.*Cdx2;
-    CFL = (UU(epsilon~=0,2,2)./UU(epsilon~=0,1,2)).*dt./dx;
-    CFL = max(abs(CFL(:)));
+    CFL1 = dt./(dx^2).*(epsFunc(UU(:,2:end,2), dx) + epsFunc(UU(:,1:end-1,2), dx));
+    CFL1 = max(abs(CFL1(:)));
+    CFL2 = 2.*(UU(2,2:end-1,end)./UU(1,2:end-1,end)).*dt./(epsFunc(UU(:,2:end,2), dx) + epsFunc(UU(:,1:end-1,2), dx));
+    CFL2 = max(abs(CFL2(:)));
     cflFactor = 1;
-    if (~isempty(CFL) && (CFL~=cfl)) && any(epsilon > 0)
-        cflFactor = min(cfl/CFL,cfl/max(abs(diag(alphaC))));
-        alphaL = alphaL.*(1+cflFactor)./2;
-        alphaC = alphaC.*(1+cflFactor)./2;
+    if (~isempty(CFL1) && ((CFL1 > cfl)||(CFL2 ~=cfl))) && any(UU(2,:,2) > 0)
+        cflFactor = min(cfl/CFL1,cfl/CFL2);
         dt = dt.*cflFactor;
         
-%         if abs(log10(cflFactor)) > 0.005
-%             fprintf('CFL condition not met!\n');
-%             fprintf('Changing time steps\n');
-%             fprintf('New time step:%0.5e\n', dt);
-%         end
+        if abs(log10(cflFactor)) > 0.1
+            fprintf('CFL condition not met!\n');
+            fprintf('Changing time steps\n');
+            fprintf('New time step:%0.5e\n', dt);
+        end
         
-    end
-    waveSpd = (1+cflFactor).*dt.*Ldx;
-
+    end    
     
-    UU(:,:,3) = (eye(length(xx))+alphaC)\((eye(length(xx)) - alphaC)*UU(:,:,1) + alphaL*UU(:,:,2) - waveSpd*FF);
+    % Calculate Next Time-Step
+    UU(:,2:end-1,3) = (UU(:,2:end-1,1).*(1 - dt./(dx^2).*(epsFunc(UU(:,2:end,2), dx) + epsFunc(UU(:,1:end-1,2), dx))) - dt.*(FF(:,3:end) - FF(:,1:end-2))./dx + 2.*dt./(dx^2).*(epsFunc(UU(:,2:end,2), dx).*UU(:,3:end,2) + epsFunc(UU(:,1:end-1,2), dx).*UU(:,1:end-2,2)))./(1 + dt./(dx^2).*(epsFunc(UU(:,2:end,2), dx) + epsFunc(UU(:,1:end-1,2), dx)));
     time(end+1) = time(end)+dt;
+    
 end
 
 %% Post Process
 
-figure();
-plot(xx,UU(:,1,end));
-title('Density');
+figure(1);
+for i = 1:size(UU,1)
+    if i == 1
+        plot(xx, UU(i,:,end));
+    else
+        plot(xx, UU(i,:,end)./UU(1,:,end));
+    end
+    hold on;
+end
 
-figure();
-plot(xx,(UU(:,2,end)./UU(:,1,end)));
-title('Velocity');
-
-figure();
-PP = (gam - 1).*(UU(:,3,3) - 0.5.*UU(:,2,3).^2./UU(:,1,3));
+PP = (gam - 1).*(UU(3,:,3) - 0.5.*UU(2,:,3).^2./UU(1,:,3));
 plot(xx,PP);
-title('Pressure');
+
+hold off;
+title('Sod Shock Tube');
+legend('\rho', 'u', 'e', 'p', 'Location', 'BestOutside');
+set(gca,'FontSize', 16);
+saveas(gcf, 'sodShockTube.pdf');
