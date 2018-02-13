@@ -3,6 +3,7 @@ function varargout = vonNeumRichtVisc(FF, GR, BC, varargin)
 alpha = 0.01;
 power = 2;
 % visc = zeros(size(FF, 1), size(FF,2));
+epsMin = 0.0028;
 % visc = zeros(size(FF));
 % indRho = reshape(strcmp(BC.N.varName, '\rho'),1,1,size(FF,3));
 % indV1 = reshape(strcmp(BC.N.varType, 'v1'),1,1,size(FF,3));
@@ -28,15 +29,19 @@ function visc = calcVisc(DIR)
         case 'W' 
             rhoSens = 1;%0.5.*(FF(:,:,indRho) + [bcVals(:,:,indRho), FF(:,1:end-1, indRho)]);
     %         dudx = 
+            visc = alpha .*GR.dx^power.* abs(diff([bcVals, FF], 1, 2)./GR.dx).^2 ./ (0.5.*(abs(FF) + abs([bcVals, FF(:,1:end-1,:)]))) ;
 
         case 'E'
             rhoSens = 1;%0.5.*(FF(:,:,indRho) + [FF(:,2:end, indRho), bcVals(:,:,indRho)]);
+            visc = alpha .*GR.dx^power.* abs(diff([FF, bcVals], 1, 2)./GR.dx).^2 ./ (0.5.*(abs(FF) + abs([FF(:,2:end, :), bcVals]))) ;
 
         case 'N'
             rhoSens = 1;%0.5.*(FF(:,:,indRho) + [FF(2:end,:,indRho); bcVals(:,:,indRho)]);
+            visc = alpha .*GR.dy^power.* abs(diff([FF; bcVals], 1, 1)./GR.dy).^2 ./ (0.5.*(abs(FF) + abs([FF(2:end,:,:); bcVals]))) ;
 
         case 'S'
             rhoSens = 1;%0.5.*(FF(:,:,indRho) + [bcVals(:,:,indRho); FF(1:end-1,:, indRho)]);
+            visc = alpha .*GR.dy^power.* abs(diff([bcVals; FF], 1, 1)./GR.dy).^2 ./ (0.5.*(abs(FF) + abs([bcVals; FF(1:end-1,:,:)]))) ;
 
     end
     testInd = isinf(visc) + isnan(visc);
