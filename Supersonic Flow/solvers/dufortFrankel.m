@@ -51,7 +51,7 @@ while norm(res(end,:)./maxRes) > GR.tol || time(end) < GR.tEnd
     
     % Calculate non-diffusive terms
     [funcOut, waveSpd] = func(GR, FL, BC, UU.fv(:,:,:,2));
-    alphaWave = 2.*(waveSpd(1)./max(max(epsE + epsW)) + waveSpd(2)./max(max(epsN + epsS)))*GR.dt;
+    alphaWave = (waveSpd(1)./max(max(epsE + epsW)) + waveSpd(2)./max(max(epsN + epsS)))*GR.dt;
 %     alphaWave = waveSpd(1).*GR.dt./GR.dx + waveSpd(2).*GR.dt./GR.dy;
     
     % Check CFL

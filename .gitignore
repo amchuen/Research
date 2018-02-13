@@ -113,3 +113,5 @@ Supersonic Flow/equations/fullPotential/bodyOffGrid/bcCalc.m
 Supersonic Flow/equations/fullPotential/bodyOffGrid/CIPMcart.m
 Supersonic Flow/equations/fullPotential/bodyOffGrid/dufortFrankel.m
 Supersonic Flow/equations/fullPotential/bodyOffGrid/testDFfunc.m
+Supersonic Flow/visc/varViscDocumentation.blg
+Supersonic Flow/visc/varViscDocumentation.out

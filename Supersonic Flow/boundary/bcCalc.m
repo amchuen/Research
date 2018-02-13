@@ -117,7 +117,8 @@ function BC_vals = gen_outletBC(GR, BC, FF, DIR)
         case 'E' 
             indTan = reshape(strcmp(BC.(DIR).varType, 'v1'),1,1,size(FF,3)) + reshape(strcmp(BC.(DIR).varType, 'v2'),1,1,size(FF,3)) + reshape(strcmp(BC.(DIR).varType, 's'),1,1,size(FF,3));
             indPhi = reshape(strcmp(BC.(DIR).varType, 'phi'),1,1,size(FF,3)); % checks for potential
-            BC_vals = FF(:,end-1,:).*indTan + (2.*FF(:,end,:) - FF(:,end-1,:)).*indPhi;
+%             BC_vals = FF(:,end-1,:).*indTan + (2.*FF(:,end,:) - FF(:,end-1,:)).*indPhi;
+            BC_vals = (4/3.*FF(:,end,:) - 1/3.*FF(:,end-1,:)).*indTan + (2.*FF(:,end,:) - FF(:,end-1,:)).*indPhi;
 
         case 'N' 
             BC_vals = FF(end,:,:);
@@ -237,7 +238,7 @@ function BC_vals = gen_wallBC(GR, BC, FF, DIR)
             indNorm = reshape(strcmp(BC.(DIR).varType, 'v1'),1,1,size(FF,3));
             if GR.isPolar
                 BC_vals = FF(1,:,:).*(indScalar + indPhi + indTan./(1-0.5.*GR.dR./GR.r_cyl) - indNorm)...
-                            + 2.*FF(1,:,indScalar).*reshape(BC.(DIR).dydx,1,size(FF,2)).*indNorm;%.*(~indPhi + indPhi.*GR.RR_S(1,:)./GR.RR_N(1,:))
+                            + 2.*FF(1,:,indRho).*reshape(BC.(DIR).dydx,1,size(FF,2)).*indNorm;%.*(~indPhi + indPhi.*GR.RR_S(1,:)./GR.RR_N(1,:))
 %                 BC_vals = FF(2,:,:);
             else
                 BC_vals = (  FF(1,:,:).*(indTan+indScalar+indPhi-indNorm)...

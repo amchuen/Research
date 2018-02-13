@@ -4,13 +4,13 @@ clear;
 
 %% GR - grid information, such as the meshfield, grid spacing (dx, dy, etc.)
 % Define Grid
-dy = 0.04;
-dx = 0.04;
+dy = 0.08;
+dx = 0.05;
 
 % Field Axis Values
-y_max = 30;
-x_max = 6;%7+20*dx;
-x_min = -3;%-7-39*dx; %(-19*dx);
+y_max = 50;
+x_max = 5;%7+20*dx;
+x_min = -5;%-7-39*dx; %(-19*dx);
 x_vals = x_min:dx:x_max;
 y_vals = 0:dy:y_max;
 [GR.XX, GR.YY] = meshgrid(x_vals, y_vals);
@@ -19,8 +19,8 @@ GR.dy = dy;
 GR.isPolar = 0;
 
 %% FL - fluid parameters
-FL.gam = 1.4; % heat 
-FL.M0 = 1.4;
+FL.gam = 2; % heat 
+FL.M0 = 1.1;
 
 %% Simulation control, including tolerances, viscous factor gain, etc.
 
