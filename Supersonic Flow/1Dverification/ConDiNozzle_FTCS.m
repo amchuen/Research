@@ -6,7 +6,7 @@ close all;
 
 % dx = 0.0025;
 % xx = (0:dx:1)';
-xx = linspace(0.5,1,101);
+xx = linspace(.5,1,51);
 dx = xx(2) - xx(1);
 dt = 0.1;
 
@@ -73,7 +73,7 @@ while length(time) < 2e3 || norm(res(end,:)) > 1e-3
     % Outflow Boundary Condition
     % 1) Extrapolate rho and U
 %     UU(:,end,2:3) = 4/3.*UU(:,end-1,2:3) - 1/3.*UU(:,end-2,2:3);
-%     UU(:,end,2:3) = 5/2.*UU(:,end-1,2:3) - 2.*UU(:,end-2,2:3) + 0.5.*UU(:,end-3,2:3); % - 1/3.*UU(:,end-2,2:3);
+    UU(:,end,2:3) = 5/2.*UU(:,end-1,2:3) - 2.*UU(:,end-2,2:3) + 0.5.*UU(:,end-3,2:3); % - 1/3.*UU(:,end-2,2:3);
 %     
 %     % 2) Calculate E from extrapolation
     UU(3,end,2:3) = (p_i.*g_x(end)/(gam-1) + 0.5.*(UU(2,end,2:3).^2)./UU(1,end,2:3));
@@ -91,12 +91,13 @@ while length(time) < 2e3 || norm(res(end,:)) > 1e-3
     U_mA = abs(U_0 - sqrt(gam.*PP(2:end-1).*g_x(2:end-1)./UU(1,2:end-1,end)));%.*g_x(2:end-1));
     Umax = max([max(U_0(:)), max(U_pA(:)), max(U_mA(:))]);
     CFL2 = Umax.*dt./(epsFunc(UU(:,2:end,2), dx) + epsFunc(UU(:,1:end-1,2), dx));
+%     CFL3 = (UU(2,2:end-1,end)./UU(1,2:end-1,end)).*dt./dx;
     cflFactor = 1;
-    if (~isempty(CFL1) && ((max(abs(CFL1(:))) > cfl)||(max(abs(CFL2(:))) > cfl))) && any(UU(2,:,2) > 0)
+    if (~isempty(CFL1) && ((max(abs(CFL1(:))) > cfl)||(max(abs(CFL2(:))) ~=cfl))) && any(UU(2,:,2) > 0)
         cflFactor = min([cfl/max(abs(CFL2(:))),cfl/max(abs(CFL1(:)))]);
         dt = dt.*cflFactor;
-        CFL1 = CFL1 .* (1 + cflFactor)/2;
-%         CFL2 = CFL2 .* (1+ cflFactor)/2;
+        CFL1 = CFL1 .* cflFactor;
+        CFL2 = CFL2 .* cflFactor;
         
         if abs(log10(dtLast/dt)) > 0.1
             fprintf('CFL condition not met!\n');
@@ -106,11 +107,11 @@ while length(time) < 2e3 || norm(res(end,:)) > 1e-3
         end
         
     end    
-        
+    
     % Calculate Next Time-Step
     UU(:,2:end-1,3) = (UU(:,2:end-1,1).*(1 - CFL1)...
-                        + (1+1/cflFactor).*dt./(dx^2).*(epsFunc(UU(:,2:end,2), dx).*UU(:,3:end,2) + epsFunc(UU(:,1:end-1,2), dx).*UU(:,1:end-2,2))...
-                        - (1+1/cflFactor).*dt.*((FF(:,3:end) - FF(:,1:end-2))./(2.*dx) - [0;1;0].*PP(2:end-1).*dgdx(2:end-1)))./(1 + CFL1);
+                        + dt./(dx^2).*(epsFunc(UU(:,2:end,2), dx).*UU(:,3:end,2) + epsFunc(UU(:,1:end-1,2), dx).*UU(:,1:end-2,2))...
+                        - dt.*((FF(:,3:end) - FF(:,1:end-2))./(2.*dx) - [0;1;0].*PP(2:end-1).*dgdx(2:end-1)));
     time(end+1) = time(end)+dt;
     
     res(end+1,:) = reshape(max(UU(:,:,3) - UU(:,:,2), [], 2)./dt, 1,3);
