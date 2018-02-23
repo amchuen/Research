@@ -1,10 +1,10 @@
 function epsilon = epsFunc(U, dx)
 
-visc = 0.0;
-visc_ss = 0.00075;
+visc = 0.5;
+visc_ss = 0.1*dx;
 % visc_ss = 0.001;
 
-epsilon = visc.*abs(diff(U,1,2)).^2;
+epsilon = visc.*dx.*abs(diff(U,1,2)).^3;
 denom = (0.5.*(abs(U(:,2:end,:))+abs(U(:,1:end-1,:))));
 epsilon(denom~=0) = epsilon(denom~=0) ./ denom(denom~=0);
 
