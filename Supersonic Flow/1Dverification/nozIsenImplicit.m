@@ -75,18 +75,18 @@ for ii = 1:1%length(gam_list)
 
         % Outflow Boundary Condition
         % 1) Extrapolate rho and E
-        UU(:,end,2:3) = 5/2.*UU(:,end-1,2:3) - 2.*UU(:,end-2,2:3) + 0.5.*UU(:,end-3,2:3); % - 1/3.*UU(:,end-2,2:3);
+        UU(:,end,:) = 5/2.*UU(:,end-1,:) - 2.*UU(:,end-2,:) + 0.5.*UU(:,end-3,:); % - 1/3.*UU(:,end-2,2:3);
 
         % 2) Fix Rho
-        UU(1,end,2:3) = g_x(end).*((gam.*p_i).^(1/gam));
+        UU(1,end,:) = g_x(end).*((gam.*p_i).^(1/gam));
         
         % Calculate Next Time-Step
         epsE = epsFunc(UU(:,2:end,2), dx)';
         epsW = epsFunc(UU(:,1:end-1,2), dx)';
-        aa = 0.5.*[0; epsW(:,1); 0; 0; epsW(:,2); 0];
+        aa = 0.5.*[0; epsW(:,1); 0; 0; epsW(:,2); 0]./dx^2;
         bb = [  1; 0.5.*(-(epsE(:,1) + epsW(:,1))./dx^2 - visc_t./dt^2 - 1./(2*dt)); 1;...
                 1; 0.5.*(-(epsE(:,2) + epsW(:,2))./dx^2 - visc_t./dt^2 - 1./(2*dt)); 1];
-        cc = 0.5.*[0; epsE(:,1); 0; 0; epsE(:,2); 0];
+        cc = 0.5.*[0; epsE(:,1); 0; 0; epsE(:,2); 0]./dx^2;
         dd = [  UU(1,1,3); -2*visc_t.*UU(1,2:end-1,2)'./dt^2 + (visc_t./dt^2 - 0.5./dt).*UU(1,2:end-1,1)' + (FF(1,3:end) - FF(1,1:end-2))'./(2*dx) - 0.5.*(epsE(:,1).*(UU(1,3:end,1)-UU(1,2:end-1,1))' - epsW(:,1).*(UU(1,2:end-1,1)-UU(1,1:end-2,1))')./dx^2; UU(1,end,3);...
                 UU(2,1,3); -2*visc_t.*UU(2,2:end-1,2)'./dt^2 + (visc_t./dt^2 - 0.5./dt).*UU(2,2:end-1,1)' + (FF(2,3:end) - FF(2,1:end-2))'./(2*dx) - 0.5.*(epsE(:,2).*(UU(2,3:end,1)-UU(2,2:end-1,1))' - epsW(:,2).*(UU(2,2:end-1,1)-UU(2,1:end-2,1))')./dx^2 - PP(2:end-1)'.*dgdx(2:end-1)'; UU(2,end,3)];
         UU(:,:,3) = reshape(thomas3(aa,bb,cc,dd),size(UU,2),2)';
@@ -104,10 +104,21 @@ for ii = 1:1%length(gam_list)
             - ((FF(:,3:end) - FF(:,1:end-2))./(2.*dx) - [0;1].*PP(2:end-1).*dgdx(2:end-1))), [], 2), 1, 2);
     
         figure(1);
-        semilogy(res);
+%         semilogy(res);
+        for i = 1:size(UU,1)
+            if i == 1
+                plot(xx, UU(i,:,end)./g_x, 'o-');
+            else
+                plot(xx, UU(i,:,end)./UU(1,:,end), 'o-');
+            end
+            hold on;
+        end
+
+        plot(xx,PP);
         title(['Run: ' num2str(ii)]);
-        legend('\rho', 'u', 'Location', 'BestOutside');
+        legend('\rho', 'u', 'p', 'Location', 'BestOutside');
         drawnow;
+        hold off;
 
     end
     
