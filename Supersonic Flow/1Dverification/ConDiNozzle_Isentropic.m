@@ -80,11 +80,11 @@ for ii = 1:1%length(gam_list)
 
         % Calculate CFL
         CFL1 = dt./(dx^2).*(epsFunc(UU(:,2:end,2), dx) + epsFunc(UU(:,1:end-1,2), dx));
-%         U_0 = abs(UU(2,2:end-1,end)./UU(1,2:end-1,end));
-%         U_pA = abs(U_0 + sqrt(gam.*PP(2:end-1).*g_x(2:end-1)./UU(1,2:end-1,end)));%.*g_x(2:end-1));
-%         U_mA = abs(U_0 - sqrt(gam.*PP(2:end-1).*g_x(2:end-1)./UU(1,2:end-1,end)));%.*g_x(2:end-1));
-%         Umax = max([max(U_0(:)), max(U_pA(:)), max(U_mA(:))]);
-%         dt = dx./(sqrt(2*visc_x/visc_t - Umax^2));
+        U_0 = abs(UU(2,2:end-1,end)./UU(1,2:end-1,end));
+        U_pA = abs(U_0 + sqrt(gam.*PP(2:end-1).*g_x(2:end-1)./UU(1,2:end-1,end)));%.*g_x(2:end-1));
+        U_mA = abs(U_0 - sqrt(gam.*PP(2:end-1).*g_x(2:end-1)./UU(1,2:end-1,end)));%.*g_x(2:end-1));
+        Umax = max([max(U_0(:)), max(U_pA(:)), max(U_mA(:))]);
+        dt = dx./(sqrt(2*visc_x/visc_t - Umax^2));
         if visc_t <= dt.*max(CFL1(:))./2
             visc_t = 1.1.*dt.*max(CFL1(:))./2;
             fprintf('Changing time viscosity\nNew time visc: %0.5f\n', visc_t);

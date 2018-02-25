@@ -80,20 +80,26 @@ for ii = 1:1%length(gam_list)
         % 2) Fix Rho
         UU(1,end,:) = g_x(end).*((gam.*p_i).^(1/gam));
         
+        % Check Stability?
+        epsE = epsFunc(UU(:,2:end,2), dx);
+        epsW = epsFunc(UU(:,1:end-1,2), dx);
+        CFL = 0.5*dt - 0.5.*(epsE + epsW).*(dt/dx).^2;
+        if visc_t >= max(CFL(:))
+            visc_t = max(CFL(:))./1.5;
+            fprintf('Time viscosity changed: %0.5f\n', visc_t);
+        end            
+        
         % Calculate Next Time-Step
-        epsE = epsFunc(UU(:,2:end,2), dx)';
-        epsW = epsFunc(UU(:,1:end-1,2), dx)';
-        aa = 0.5.*[0; epsW(:,1); 0; 0; epsW(:,2); 0]./dx^2;
-        bb = [  1; 0.5.*(-(epsE(:,1) + epsW(:,1))./dx^2 - visc_t./dt^2 - 1./(2*dt)); 1;...
-                1; 0.5.*(-(epsE(:,2) + epsW(:,2))./dx^2 - visc_t./dt^2 - 1./(2*dt)); 1];
-        cc = 0.5.*[0; epsE(:,1); 0; 0; epsE(:,2); 0]./dx^2;
-        dd = [  UU(1,1,3); -2*visc_t.*UU(1,2:end-1,2)'./dt^2 + (visc_t./dt^2 - 0.5./dt).*UU(1,2:end-1,1)' + (FF(1,3:end) - FF(1,1:end-2))'./(2*dx) - 0.5.*(epsE(:,1).*(UU(1,3:end,1)-UU(1,2:end-1,1))' - epsW(:,1).*(UU(1,2:end-1,1)-UU(1,1:end-2,1))')./dx^2; UU(1,end,3);...
-                UU(2,1,3); -2*visc_t.*UU(2,2:end-1,2)'./dt^2 + (visc_t./dt^2 - 0.5./dt).*UU(2,2:end-1,1)' + (FF(2,3:end) - FF(2,1:end-2))'./(2*dx) - 0.5.*(epsE(:,2).*(UU(2,3:end,1)-UU(2,2:end-1,1))' - epsW(:,2).*(UU(2,2:end-1,1)-UU(2,1:end-2,1))')./dx^2 - PP(2:end-1)'.*dgdx(2:end-1)'; UU(2,end,3)];
+        aa = reshape([[0;0], 0.5.*epsW./(dx^2), [0;0]]',[],1);
+        bb = reshape([[1;1], 0.5.*(-(epsE + epsW)./dx^2) - visc_t./dt^2 - 1./(2*dt), [1;1]]',[],1);
+        cc = reshape([[0;0], 0.5.*epsE./(dx^2), [0;0]]',[],1);
+        dd = reshape([UU(:,1,3),    -2.*visc_t.*UU(:,2:end-1,2)./dt^2 ...
+                                    + (FF(:,3:end) - FF(:,1:end-2))./(2*dx)...
+                                    - [0;1].*PP(2:end-1).*dgdx(2:end-1)...
+                                    + (visc_t./dt^2-0.5/dt+0.5.*(epsE + epsW)./dx^2).*UU(:,2:end-1,1)...
+                                    - 0.5.*(epsE.*UU(:,3:end,1)+epsW.*UU(:,1:end-2,1))./dx^2,...
+                                    UU(:,end,3)]',[],1);
         UU(:,:,3) = reshape(thomas3(aa,bb,cc,dd),size(UU,2),2)';
-%         UU(:,2:end-1,3) = (.*UU(:,3:end,2) + epsFunc(UU(:,1:end-1,2), dx).*UU(:,1:end-2,2))./(dx^2)...
-%                             - UU(:,2:end-1,2).*((epsFunc(UU(:,2:end,2), dx) + epsFunc(UU(:,1:end-1,2), dx))./(dx^2) - 2.*visc_t./(dt^2))...
-%                             - (FF(:,3:end) - FF(:,1:end-2))./(2*dx) + [0;1].*PP(2:end-1).*dgdx(2:end-1)...
-%                             - UU(:,2:end-1,1).*(visc_t./(dt^2)-0.5/dt))./(visc_t./(dt^2) + 0.5/dt);
         time(end+1) = time(end)+dt;
 
         % Update Flux and Pressure
@@ -104,26 +110,39 @@ for ii = 1:1%length(gam_list)
             - ((FF(:,3:end) - FF(:,1:end-2))./(2.*dx) - [0;1].*PP(2:end-1).*dgdx(2:end-1))), [], 2), 1, 2);
     
         figure(1);
-%         semilogy(res);
-        for i = 1:size(UU,1)
-            if i == 1
-                plot(xx, UU(i,:,end)./g_x, 'o-');
-            else
-                plot(xx, UU(i,:,end)./UU(1,:,end), 'o-');
-            end
-            hold on;
-        end
-
-        plot(xx,PP);
+        semilogy(res);
+        legend('\rho', 'u', 'Location', 'BestOutside');
+%         for i = 1:size(UU,1)
+%             if i == 1
+%                 plot(xx, UU(i,:,end)./g_x, 'o-');
+%             else
+%                 plot(xx, UU(i,:,end)./UU(1,:,end), 'o-');
+%             end
+%             hold on;
+%         end
+% 
+%         plot(xx,PP);
+%         legend('\rho', 'u', 'p', 'Location', 'BestOutside');
         title(['Run: ' num2str(ii)]);
-        legend('\rho', 'u', 'p', 'Location', 'BestOutside');
         drawnow;
         hold off;
 
     end
     
 %% Post Process
-    fileName = ['gam_' num2str(ii)];
-    save([dirName '\' fileName], 'UU', 'res', 'gam');
+    explicit = load([dirName '\gam_1']);
+    figure(1);
+    semilogy(res);
+    legend('\rho', 'u', 'Location', 'BestOutside');
+    title('Implicit Scheme');
+    set(gca, 'FontSize', 14);
+    saveas(gcf, 'implicit_residual', 'pdf');
+    
+    figure(2);
+    semilogy(explicit.res);
+    legend('\rho', 'u', 'Location', 'BestOutside');
+    title('Explicit Scheme');
+    set(gca, 'FontSize', 14);
+    saveas(gcf, 'explicit_residual', 'pdf');
 
 end
