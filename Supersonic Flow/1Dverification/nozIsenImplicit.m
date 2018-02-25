@@ -9,6 +9,9 @@ if ~exist(dirName, 'dir')
 end
 
 addpath(dirName);
+addpath('fluxSchemes\');
+addpath('viscositySchemes\');
+addpath('../../Matrix Solvers/');
 
 %% Generate Grid
 
@@ -17,7 +20,7 @@ dx = xx(2) - xx(1);
 
 visc_x = 0.002;
 visc_t = 5e-5;
-dt = 0.0025;
+dt = 0.001;
 
 %% Nozzle Geometry
 g_x = 1 + (2.*xx-1).^2;
@@ -55,7 +58,6 @@ for ii = 1:1%length(gam_list)
     UU = [rho0.*g_x; rho0.*linspace(u0, 0.4, length(g_x)).*g_x];
     UU(:,end) = [rho_e; rho_e*u_e].*g_x(end);
     UU = repmat(UU,1,1,3);
-
     
     % Setup Time Simulation?
     time = 0;
@@ -77,24 +79,21 @@ for ii = 1:1%length(gam_list)
 
         % 2) Fix Rho
         UU(1,end,2:3) = g_x(end).*((gam.*p_i).^(1/gam));
-
-        % Calculate CFL
-        CFL1 = dt./(dx^2).*(epsFunc(UU(:,2:end,2), dx) + epsFunc(UU(:,1:end-1,2), dx));
-%         U_0 = abs(UU(2,2:end-1,end)./UU(1,2:end-1,end));
-%         U_pA = abs(U_0 + sqrt(gam.*PP(2:end-1).*g_x(2:end-1)./UU(1,2:end-1,end)));%.*g_x(2:end-1));
-%         U_mA = abs(U_0 - sqrt(gam.*PP(2:end-1).*g_x(2:end-1)./UU(1,2:end-1,end)));%.*g_x(2:end-1));
-%         Umax = max([max(U_0(:)), max(U_pA(:)), max(U_mA(:))]);
-%         dt = dx./(sqrt(2*visc_x/visc_t - Umax^2));
-        if visc_t <= dt.*max(CFL1(:))./2
-            visc_t = 1.1.*dt.*max(CFL1(:))./2;
-            fprintf('Changing time viscosity\nNew time visc: %0.5f\n', visc_t);
-        end
         
         % Calculate Next Time-Step
-        UU(:,2:end-1,3) = ((epsFunc(UU(:,2:end,2), dx).*UU(:,3:end,2) + epsFunc(UU(:,1:end-1,2), dx).*UU(:,1:end-2,2))./(dx^2)...
-                            - UU(:,2:end-1,2).*((epsFunc(UU(:,2:end,2), dx) + epsFunc(UU(:,1:end-1,2), dx))./(dx^2) - 2.*visc_t./(dt^2))...
-                            - (FF(:,3:end) - FF(:,1:end-2))./(2*dx) + [0;1].*PP(2:end-1).*dgdx(2:end-1)...
-                            - UU(:,2:end-1,1).*(visc_t./(dt^2)-0.5/dt))./(visc_t./(dt^2) + 0.5/dt);
+        epsE = epsFunc(UU(:,2:end,2), dx)';
+        epsW = epsFunc(UU(:,1:end-1,2), dx)';
+        aa = 0.5.*[0; epsW(:,1); 0; 0; epsW(:,2); 0];
+        bb = [  1; 0.5.*(-(epsE(:,1) + epsW(:,1))./dx^2 - visc_t./dt^2 - 1./(2*dt)); 1;...
+                1; 0.5.*(-(epsE(:,2) + epsW(:,2))./dx^2 - visc_t./dt^2 - 1./(2*dt)); 1];
+        cc = 0.5.*[0; epsE(:,1); 0; 0; epsE(:,2); 0];
+        dd = [  UU(1,1,3); -2*visc_t.*UU(1,2:end-1,2)'./dt^2 + (visc_t./dt^2 - 0.5./dt).*UU(1,2:end-1,1)' + (FF(1,3:end) - FF(1,1:end-2))'./(2*dx) - 0.5.*(epsE(:,1).*(UU(1,3:end,1)-UU(1,2:end-1,1))' - epsW(:,1).*(UU(1,2:end-1,1)-UU(1,1:end-2,1))')./dx^2; UU(1,end,3);...
+                UU(2,1,3); -2*visc_t.*UU(2,2:end-1,2)'./dt^2 + (visc_t./dt^2 - 0.5./dt).*UU(2,2:end-1,1)' + (FF(2,3:end) - FF(2,1:end-2))'./(2*dx) - 0.5.*(epsE(:,2).*(UU(2,3:end,1)-UU(2,2:end-1,1))' - epsW(:,2).*(UU(2,2:end-1,1)-UU(2,1:end-2,1))')./dx^2 - PP(2:end-1)'.*dgdx(2:end-1)'; UU(2,end,3)];
+        UU(:,:,3) = reshape(thomas3(aa,bb,cc,dd),size(UU,2),2)';
+%         UU(:,2:end-1,3) = (.*UU(:,3:end,2) + epsFunc(UU(:,1:end-1,2), dx).*UU(:,1:end-2,2))./(dx^2)...
+%                             - UU(:,2:end-1,2).*((epsFunc(UU(:,2:end,2), dx) + epsFunc(UU(:,1:end-1,2), dx))./(dx^2) - 2.*visc_t./(dt^2))...
+%                             - (FF(:,3:end) - FF(:,1:end-2))./(2*dx) + [0;1].*PP(2:end-1).*dgdx(2:end-1)...
+%                             - UU(:,2:end-1,1).*(visc_t./(dt^2)-0.5/dt))./(visc_t./(dt^2) + 0.5/dt);
         time(end+1) = time(end)+dt;
 
         % Update Flux and Pressure
