@@ -29,6 +29,7 @@ dgdx = [4*(2*xx(1)-1), (g_x(3:end)-g_x(1:end-2))./(2*dx), 0];
 %% Fluid Properties
 gam_list = 1.4:.1:2;
 cfl = 1;
+wt = 1;
 
 %% Perform Runs
 for ii = 1:1%length(gam_list)
@@ -90,14 +91,14 @@ for ii = 1:1%length(gam_list)
         end            
         
         % Calculate Next Time-Step
-        aa = reshape([[0;0], 0.5.*epsW./(dx^2), [0;0]]',[],1);
-        bb = reshape([[1;1], 0.5.*(-(epsE + epsW)./dx^2) - visc_t./dt^2 - 1./(2*dt), [1;1]]',[],1);
-        cc = reshape([[0;0], 0.5.*epsE./(dx^2), [0;0]]',[],1);
+        aa = reshape([[0;0], wt.*epsW./(dx^2), [0;0]]',[],1);
+        bb = reshape([[1;1], wt.*(-(epsE + epsW)./dx^2) - visc_t./dt^2 - 1./(2*dt), [1;1]]',[],1);
+        cc = reshape([[0;0], wt.*epsE./(dx^2), [0;0]]',[],1);
         dd = reshape([UU(:,1,3),    -2.*visc_t.*UU(:,2:end-1,2)./dt^2 ...
                                     + (FF(:,3:end) - FF(:,1:end-2))./(2*dx)...
                                     - [0;1].*PP(2:end-1).*dgdx(2:end-1)...
-                                    + (visc_t./dt^2-0.5/dt+0.5.*(epsE + epsW)./dx^2).*UU(:,2:end-1,1)...
-                                    - 0.5.*(epsE.*UU(:,3:end,1)+epsW.*UU(:,1:end-2,1))./dx^2,...
+                                    + (visc_t./dt^2-0.5/dt+(1-wt).*(epsE + epsW)./dx^2).*UU(:,2:end-1,1)...
+                                    - (1-wt).*(epsE.*UU(:,3:end,1)+epsW.*UU(:,1:end-2,1))./dx^2,...
                                     UU(:,end,3)]',[],1);
         UU(:,:,3) = reshape(thomas3(aa,bb,cc,dd),size(UU,2),2)';
         time(end+1) = time(end)+dt;
