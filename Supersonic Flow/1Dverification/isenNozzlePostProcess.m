@@ -55,3 +55,14 @@ end
 plot(xShock, uShock, 'o');
 
 save([dirName '\' 'postProcess'], 'xShock', 'uShock', 'gam_list');
+
+%% Plot Water Results
+figure();
+g_x = 1 + (2.*xx-1).^2;
+plot(xx, results(end).UU(2,:,3)./results(i).UU(1,:,3), '*-');
+hold on;
+plot(xx, results(end).UU(1,:,3)./g_x, 'o-');
+plot(xx, ((results(end).UU(1,:,3)./g_x).^gam_list(end)) ./ gam_list(end), 'o-');
+legend('\rho u', '\rho', 'P', 'Location', 'Best');
+title('\gamma = 2');
+saveas(gcf, [dirName '\gam_2'], 'pdf');

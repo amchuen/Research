@@ -2,13 +2,16 @@ clc;
 clear;
 close all;
 
-dirName = 'isentropicNozzle';
+dirName = 'testStability';
 
 if ~exist(dirName, 'dir')
     mkdir(dirName);
 end
 
 addpath(dirName);
+addpath('fluxSchemes\');
+addpath('viscositySchemes\');
+addpath('../../Matrix Solvers/');
 
 %% Generate Grid
 
@@ -18,19 +21,22 @@ dx = xx(2) - xx(1);
 visc_x = 0.002;
 visc_t = 5e-5;
 dt = 0.0025;
+ratio_list = [1.1, 1.01, 1.001, 0.999];
 
 %% Nozzle Geometry
 g_x = 1 + (2.*xx-1).^2;
 dgdx = [4*(2*xx(1)-1), (g_x(3:end)-g_x(1:end-2))./(2*dx), 0];
 
 %% Fluid Properties
-gam_list = 1.4:.1:2;
+% gam_list = 1.4:.1:2;
+gam = 2;
 cfl = 1;
 
 %% Perform Runs
-for ii = 1:1%length(gam_list)
+for ii = 1:1%length(ratio_list)
     % Assign Gamma
-    gam = gam_list(ii);
+%     gam = gam_list(ii);
+    ratio = ratio_list(ii);
     
     % Initialize Field Values
     % Inlet Conditions -> s0 = 0 (isentropic relations)
@@ -79,14 +85,15 @@ for ii = 1:1%length(gam_list)
         UU(1,end,2:3) = g_x(end).*((gam.*p_i).^(1/gam));
 
         % Calculate CFL
+        visc_x = (epsFunc(UU(:,2:end,2), dx) + epsFunc(UU(:,1:end-1,2), dx));
         CFL1 = dt./(dx^2).*(epsFunc(UU(:,2:end,2), dx) + epsFunc(UU(:,1:end-1,2), dx));
         U_0 = abs(UU(2,2:end-1,end)./UU(1,2:end-1,end));
         U_pA = abs(U_0 + sqrt(gam.*PP(2:end-1).*g_x(2:end-1)./UU(1,2:end-1,end)));%.*g_x(2:end-1));
         U_mA = abs(U_0 - sqrt(gam.*PP(2:end-1).*g_x(2:end-1)./UU(1,2:end-1,end)));%.*g_x(2:end-1));
         Umax = max([max(U_0(:)), max(U_pA(:)), max(U_mA(:))]);
-        dt = dx./(sqrt(2*visc_x/visc_t - Umax^2));
+        dt = dx./(sqrt(max(visc_x(:))/visc_t - Umax^2));
         if visc_t <= dt.*max(CFL1(:))./2
-            visc_t = 1.1.*dt.*max(CFL1(:))./2;
+            visc_t = ratio.*dt.*max(CFL1(:))./2;
             fprintf('Changing time viscosity\nNew time visc: %0.5f\n', visc_t);
         end
         
@@ -113,7 +120,18 @@ for ii = 1:1%length(gam_list)
     end
     
 %% Post Process
-    fileName = ['gam_' num2str(ii)];
-    save([dirName '\' fileName], 'UU', 'res', 'gam');
+    fileName = ['ratio_' num2str(ii)];
+    save([dirName '\' fileName]);
+    
+    figure();
+    plot(xx, UU(1,:,3)./g_x, '*-'); hold on;
+    plot(xx, UU(2,:,3)./UU(1,:,3), 'o-');
+    plot(xx, PP, '^-');
+    title(['Ratio = ' num2str(ratio)]);
+    legend('\rho', 'u', 'P', 'Location', 'Best');
+    drawnow;
+    saveas(gcf, [dirName '\' fileName]);
+    
+    close all;
 
 end
