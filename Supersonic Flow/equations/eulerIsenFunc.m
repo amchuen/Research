@@ -43,11 +43,11 @@ else
     fvOUT = FF_2 + GG_1;
 end
 
-% rho = FF(:,:,1);
-phi2w = EE(:,:,indP2)./EE(:,:,indRho);%./GR.RR;
-phi1w = EE(:,:,indP1)./EE(:,:,indRho);%./GR.RR;
-% rhow = rho;%./GR.RR;
-% waveSpd = [max([max(abs(phi2w(:))), max(rhow(:))]), max([max(abs(phi1w(:))), max(rhow(:))])];
-waveSpd = [max(abs(phi2w(:))), max(abs(phi1w(:)))];
+V2 = EE(:,:,indP2)./EE(:,:,indRho);%./GR.RR;
+V1 = EE(:,:,indP1)./EE(:,:,indRho);%./GR.RR;
+V_C = sqrt((EE(:,:,indRho).^(FL.gam-1))./(FL.M0.^2));
+V2 = max(cat(3, abs(V2+V_C), abs(V2), abs(V2-V_C)),[],3);
+V1 = max(cat(3, abs(V1+V_C), abs(V1), abs(V1-V_C)),[],3);
+waveSpd = [max(abs(V2(:))), max(abs(V1(:)))];
 
 end
