@@ -1,7 +1,7 @@
 function epsilon = epsFunc(U, dx)
 
 visc = 0.5;
-visc_ss = 0.1*dx;
+visc_ss = 0.2*dx;
 % visc_ss = 0.001;
 
 epsilon = visc.*dx.*abs(diff(U,1,2)).^3;
