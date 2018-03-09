@@ -2,7 +2,7 @@ clc;
 clear;
 close all;
 
-dirName = 'testStability';
+dirName = 'isentropicNozzle';
 
 if ~exist(dirName, 'dir')
     mkdir(dirName);
@@ -20,23 +20,21 @@ dx = xx(2) - xx(1);
 
 visc_x = 0.002;
 visc_t = 5e-5;
-dt = 0.0025;
-ratio_list = [1.1, 1.01, 1.001, 0.999];
+dt = 0.001;
 
 %% Nozzle Geometry
 g_x = 1 + (2.*xx-1).^2;
 dgdx = [4*(2*xx(1)-1), (g_x(3:end)-g_x(1:end-2))./(2*dx), 0];
 
 %% Fluid Properties
-% gam_list = 1.4:.1:2;
-gam = 2;
+gam_list = 1.4:.1:2;
 cfl = 1;
+wt = 1;
 
 %% Perform Runs
-for ii = 1:1%length(ratio_list)
+for ii = 1:1%length(gam_list)
     % Assign Gamma
-%     gam = gam_list(ii);
-    ratio = ratio_list(ii);
+    gam = gam_list(ii);
     
     % Initialize Field Values
     % Inlet Conditions -> s0 = 0 (isentropic relations)
@@ -61,7 +59,6 @@ for ii = 1:1%length(ratio_list)
     UU = [rho0.*g_x; rho0.*linspace(u0, 0.4, length(g_x)).*g_x];
     UU(:,end) = [rho_e; rho_e*u_e].*g_x(end);
     UU = repmat(UU,1,1,3);
-
     
     % Setup Time Simulation?
     time = 0;
@@ -79,29 +76,31 @@ for ii = 1:1%length(ratio_list)
 
         % Outflow Boundary Condition
         % 1) Extrapolate rho and E
-        UU(:,end,2:3) = 5/2.*UU(:,end-1,2:3) - 2.*UU(:,end-2,2:3) + 0.5.*UU(:,end-3,2:3); % - 1/3.*UU(:,end-2,2:3);
+        UU(:,end,:) = 5/2.*UU(:,end-1,:) - 2.*UU(:,end-2,:) + 0.5.*UU(:,end-3,:); % - 1/3.*UU(:,end-2,2:3);
 
         % 2) Fix Rho
-        UU(1,end,2:3) = g_x(end).*((gam.*p_i).^(1/gam));
-
-        % Calculate CFL
-        visc_x = (epsFunc(UU(:,2:end,2), dx) + epsFunc(UU(:,1:end-1,2), dx));
-        CFL1 = dt./(dx^2).*(epsFunc(UU(:,2:end,2), dx) + epsFunc(UU(:,1:end-1,2), dx));
-        U_0 = abs(UU(2,2:end-1,end)./UU(1,2:end-1,end));
-        U_pA = abs(U_0 + sqrt(gam.*PP(2:end-1).*g_x(2:end-1)./UU(1,2:end-1,end)));%.*g_x(2:end-1));
-        U_mA = abs(U_0 - sqrt(gam.*PP(2:end-1).*g_x(2:end-1)./UU(1,2:end-1,end)));%.*g_x(2:end-1));
-        Umax = max([max(U_0(:)), max(U_pA(:)), max(U_mA(:))]);
-        dt = dx./(sqrt(max(visc_x(:))/visc_t - Umax^2));
-        if visc_t <= dt.*max(CFL1(:))./2
-            visc_t = ratio.*dt.*max(CFL1(:))./2;
-            fprintf('Changing time viscosity\nNew time visc: %0.5f\n', visc_t);
-        end
+        UU(1,end,:) = g_x(end).*((gam.*p_i).^(1/gam));
+        
+        % Check Stability?
+        epsE = epsFunc(UU(:,2:end,2), dx);
+        epsW = epsFunc(UU(:,1:end-1,2), dx);
+        CFL = 0.5*dt - 0.5.*(epsE + epsW).*(dt/dx).^2;
+        if visc_t >= max(CFL(:))
+            visc_t = max(CFL(:))./1.5;
+            fprintf('Time viscosity changed: %0.5f\n', visc_t);
+        end            
         
         % Calculate Next Time-Step
-        UU(:,2:end-1,3) = ((epsFunc(UU(:,2:end,2), dx).*UU(:,3:end,2) + epsFunc(UU(:,1:end-1,2), dx).*UU(:,1:end-2,2))./(dx^2)...
-                            - UU(:,2:end-1,2).*((epsFunc(UU(:,2:end,2), dx) + epsFunc(UU(:,1:end-1,2), dx))./(dx^2) - 2.*visc_t./(dt^2))...
-                            - (FF(:,3:end) - FF(:,1:end-2))./(2*dx) + [0;1].*PP(2:end-1).*dgdx(2:end-1)...
-                            - UU(:,2:end-1,1).*(visc_t./(dt^2)-0.5/dt))./(visc_t./(dt^2) + 0.5/dt);
+        aa = reshape([[0;0], wt.*epsW./(dx^2), [0;0]]',[],1);
+        bb = reshape([[1;1], wt.*(-(epsE + epsW)./dx^2) - visc_t./dt^2 - 1./(2*dt), [1;1]]',[],1);
+        cc = reshape([[0;0], wt.*epsE./(dx^2), [0;0]]',[],1);
+        dd = reshape([UU(:,1,3),    -2.*visc_t.*UU(:,2:end-1,2)./dt^2 ...
+                                    + (FF(:,3:end) - FF(:,1:end-2))./(2*dx)...
+                                    - [0;1].*PP(2:end-1).*dgdx(2:end-1)...
+                                    + (visc_t./dt^2-0.5/dt+(1-wt).*(epsE + epsW)./dx^2).*UU(:,2:end-1,1)...
+                                    - (1-wt).*(epsE.*UU(:,3:end,1)+epsW.*UU(:,1:end-2,1))./dx^2,...
+                                    UU(:,end,3)]',[],1);
+        UU(:,:,3) = reshape(thomas3(aa,bb,cc,dd),size(UU,2),2)';
         time(end+1) = time(end)+dt;
 
         % Update Flux and Pressure
@@ -113,25 +112,38 @@ for ii = 1:1%length(ratio_list)
     
         figure(1);
         semilogy(res);
-        title(['Run: ' num2str(ii)]);
         legend('\rho', 'u', 'Location', 'BestOutside');
+%         for i = 1:size(UU,1)
+%             if i == 1
+%                 plot(xx, UU(i,:,end)./g_x, 'o-');
+%             else
+%                 plot(xx, UU(i,:,end)./UU(1,:,end), 'o-');
+%             end
+%             hold on;
+%         end
+% 
+%         plot(xx,PP);
+%         legend('\rho', 'u', 'p', 'Location', 'BestOutside');
+        title(['Run: ' num2str(ii)]);
         drawnow;
+        hold off;
 
     end
     
 %% Post Process
-    fileName = ['ratio_' num2str(ii)];
-    save([dirName '\' fileName]);
+    explicit = load([dirName '\gam_1']);
+    figure(1);
+    semilogy(res);
+    legend('\rho', 'u', 'Location', 'BestOutside');
+    title('Implicit Scheme');
+    set(gca, 'FontSize', 14);
+    saveas(gcf, 'implicit_residual', 'pdf');
     
-    figure();
-    plot(xx, UU(1,:,3)./g_x, '*-'); hold on;
-    plot(xx, UU(2,:,3)./UU(1,:,3), 'o-');
-    plot(xx, PP, '^-');
-    title(['Ratio = ' num2str(ratio)]);
-    legend('\rho', 'u', 'P', 'Location', 'Best');
-    drawnow;
-    saveas(gcf, [dirName '\' fileName]);
-    
-    close all;
+    figure(2);
+    semilogy(explicit.res);
+    legend('\rho', 'u', 'Location', 'BestOutside');
+    title('Explicit Scheme');
+    set(gca, 'FontSize', 14);
+    saveas(gcf, 'explicit_residual', 'pdf');
 
 end

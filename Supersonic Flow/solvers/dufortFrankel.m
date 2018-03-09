@@ -32,7 +32,7 @@ while norm(res(end,:)./maxRes) > GR.tol || time(end) < GR.tEnd
     UU.fv(:,:,:,1:2) = UU.fv(:,:,:,2:3);
     
     % Calculate Viscosities
-    [epsN, epsS, epsE, epsW] = epsFunc(UU.fv(:,:,:,2), GR, BC);
+    [epsN, epsS, epsE, epsW] = epsFunc(UU.fv(:,:,:,2), GR, BC, FL);
 %     epsS = epsFunc(UU.fv(:,:,:,2), GR, BC, 'S');
 %     epsW = epsFunc(UU.fv(:,:,:,2), GR, BC, 'W');
 %     epsE = epsFunc(UU.fv(:,:,:,2), GR, BC, 'E');
@@ -51,8 +51,8 @@ while norm(res(end,:)./maxRes) > GR.tol || time(end) < GR.tEnd
     
     % Calculate non-diffusive terms
     [funcOut, waveSpd] = func(GR, FL, BC, UU.fv(:,:,:,2));
-    alphaWave = (waveSpd(1)./max(max(epsE + epsW)) + waveSpd(2)./max(max(epsN + epsS)))*GR.dt;
-%     alphaWave = waveSpd(1).*GR.dt./GR.dx + waveSpd(2).*GR.dt./GR.dy;
+%     alphaWave = (waveSpd(1)./max(max(epsE + epsW)) + waveSpd(2)./max(max(epsN + epsS)))*GR.dt;
+    alphaWave = GR.dt.*(waveSpd(1)./GR.dx + waveSpd(2)./GR.dy);
     
     % Check CFL
     cflFactor = 1;

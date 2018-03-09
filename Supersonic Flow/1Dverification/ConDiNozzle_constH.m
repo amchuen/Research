@@ -4,7 +4,7 @@ close all;
 
 %% Generate Grid
 
-xx = linspace(0,1,151);
+xx = linspace(0.5,1,151);
 dx = xx(2) - xx(1);
 
 visc_x = 0.002;
@@ -37,6 +37,7 @@ elseif xx(1) == 0.5
 end
 p0 = (rho0^gam)/gam;
 E0 = p0/((gam-1)*rho0) + 0.5.*u0^2;
+H0 = 3;
 
 % Exit Conditions
 p_i = 1;
@@ -45,27 +46,27 @@ u_e = 0.416198;% 0.4162064994502009;
 rho_e = 1/(g_x(end)*u_e);
 
 % UU = [rho0; rho0*u0; rho0*E0].*g_x;
-UU = [rho0.*g_x; rho0.*linspace(u0, 0.4, length(g_x)).*g_x; rho0.*E0.*g_x];
-UU(:,end) = [rho_e; rho_e*u_e; rho_e*E0].*g_x(end);
+UU = [rho0.*g_x; rho0.*linspace(u0, 0.4, length(g_x)).*g_x];
+UU(:,end) = [rho_e; rho_e*u_e].*g_x(end);
 UU = repmat(UU,1,1,3);
 
 
 %% Setup Time Simulation?
 time = 0;
 tEnd = 10*5;
-FF =  fluxFunc(UU(:,:,3), gam);
-PP = (gam-1).*(UU(3,:,3) - 0.5.*(UU(2,:,3).^2) ./ UU(1,:,3))./g_x;
+FF =  fluxFuncIsentropic(UU(:,:,3), gam);
+PP = (gam-1)./gam.*(UU(1,:,3).*H0 - 0.5.*(UU(2,:,3).^2)./UU(1,:,3))./g_x;
 % res = reshape(max((epsFunc(UU(:,2:end,3), dx).*(UU(:,3:end,3)-UU(:,2:end-1,3))-epsFunc(UU(:,1:end-1,3), dx).*(UU(:,2:end-1,3)-UU(:,1:end-2,3)))./(dx^2)...
 %         - ((FF(:,3:end) - FF(:,1:end-2))./(2.*dx) - [0;1;0].*PP(2:end-1).*dgdx(2:end-1)), [], 2), 1, 3);
 res = reshape(max(abs((visc_x.*(UU(:,3:end,3)-UU(:,2:end-1,3))-visc_x.*(UU(:,2:end-1,3)-UU(:,1:end-2,3)))./(dx^2)...
-        - ((FF(:,3:end) - FF(:,1:end-2))./(2.*dx) - [0;1;0].*PP(2:end-1).*dgdx(2:end-1))), [], 2), 1, 3);
+        - ((FF(:,3:end) - FF(:,1:end-2))./(2.*dx) - [0;1].*PP(2:end-1).*dgdx(2:end-1))), [], 2), 1, 2);
 dtLast = dt;
 
 %% Run Simulation
 
 while length(time) < 2e2 || norm(res(end,:)) > 1e-5
     
-       % Update Field Values and boundary conditions
+   % Update Field Values and boundary conditions
     UU(:,:,1:2) = UU(:,:,2:3);
     
     % Outflow Boundary Condition
@@ -73,9 +74,8 @@ while length(time) < 2e2 || norm(res(end,:)) > 1e-5
 %     UU(:,end,2:3) = 4/3.*UU(:,end-1,2:3) - 1/3.*UU(:,end-2,2:3);
     UU(:,end,2:3) = 5/2.*UU(:,end-1,2:3) - 2.*UU(:,end-2,2:3) + 0.5.*UU(:,end-3,2:3); % - 1/3.*UU(:,end-2,2:3);
     
-    % 2) Fix U
-%     UU(2,end,2:3) = UU(1,end,2:3).*u_e;
-    UU(3,end,2:3) = (p_i.*g_x(end)/(gam-1) + 0.5.*(UU(2,end,2:3).^2)./UU(1,end,2:3));
+    % 2) Fix Rho
+    UU(1,end,2:3) = g_x(end).*gam*p_i./((gam-1).*(H0 - 0.5.*(UU(2,end,2:3)./UU(1,end,2:3)).^2));
     
     % Calculate CFL
     CFL1 = dt./(dx^2).*(epsFunc(UU(:,2:end,2), dx) + epsFunc(UU(:,1:end-1,2), dx));
@@ -112,16 +112,16 @@ while length(time) < 2e2 || norm(res(end,:)) > 1e-5
     
     UU(:,2:end-1,3) = ((epsFunc(UU(:,2:end,2), dx).*UU(:,3:end,2) + epsFunc(UU(:,1:end-1,2), dx).*UU(:,1:end-2,2))./(dx^2)...
                         - UU(:,2:end-1,2).*((epsFunc(UU(:,2:end,2), dx) + epsFunc(UU(:,1:end-1,2), dx))./(dx^2) - 2.*visc_t./(dt^2))...
-                        - (FF(:,3:end) - FF(:,1:end-2))./(2*dx) + [0;1;0].*PP(2:end-1).*dgdx(2:end-1)...
+                        - (FF(:,3:end) - FF(:,1:end-2))./(2*dx) + [0;1].*PP(2:end-1).*dgdx(2:end-1)...
                         - UU(:,2:end-1,1).*(visc_t./(dt^2)-0.5/dt))./(visc_t./(dt^2) + 0.5/dt);
     time(end+1) = time(end)+dt;
     
     % Update Flux and Pressure
-    FF =  fluxFunc(UU(:,:,3), gam);
-    PP = (gam-1).*(UU(3,:,3) - 0.5.*(UU(2,:,3).^2) ./ UU(1,:,3))./g_x;
+    FF =  fluxFuncIsentropic(UU(:,:,3), gam);
+    PP = (gam-1)./gam.*(UU(1,:,3).*H0 - 0.5.*(UU(2,:,3).^2)./UU(1,:,3))./g_x;
     
     res(end+1,:) = reshape(max(abs((epsFunc(UU(:,2:end,3), dx).*(UU(:,3:end,3)-UU(:,2:end-1,3))-epsFunc(UU(:,1:end-1,3), dx).*(UU(:,2:end-1,3)-UU(:,1:end-2,3)))./(dx^2)...
-        - ((FF(:,3:end) - FF(:,1:end-2))./(2.*dx) - [0;1;0].*PP(2:end-1).*dgdx(2:end-1))), [], 2), 1, 3);
+        - ((FF(:,3:end) - FF(:,1:end-2))./(2.*dx) - [0;1].*PP(2:end-1).*dgdx(2:end-1))), [], 2), 1, 2);
 %     res(end+1,:) = reshape(max(abs((visc_x.*(UU(:,3:end,3)-UU(:,2:end-1,3))-visc_x.*(UU(:,2:end-1,3)-UU(:,1:end-2,3)))./(dx^2)...
 %         - ((FF(:,3:end) - FF(:,1:end-2))./(2.*dx) - [0;1;0].*PP(2:end-1).*dgdx(2:end-1))), [], 2), 1, 3);
     
@@ -140,7 +140,7 @@ while length(time) < 2e2 || norm(res(end,:)) > 1e-5
 
     hold off; 
 %     title('Sod Shock Tube');
-    legend('\rho', 'u', 'e', 'p', 'Location', 'BestOutside');
+    legend('\rho', 'u', 'p', 'Location', 'BestOutside');
     drawnow;
     
 end
@@ -159,17 +159,17 @@ for i = 1:size(UU,1)
     hold on;
 end
 
-PP = (gam-1).*(UU(3,:,2) - 0.5.*(UU(2,:,2).^2) / UU(1,:,2))./g_x;
+PP = (gam-1)./gam.*(UU(1,:,3).*H0 - 0.5.*(UU(2,:,3).^2)./UU(1,:,3))./g_x;
 % PP = (gam-1).*(UU(1,:,2).*E0 - 0.5.*(UU(2,:,2).^2) ./ UU(1,:,2))./g_x;
 plot(xx,PP);
 
 hold off;
-title('Converging-Diverging Nozzle');
-legend('\rho', 'u', 'e', 'p', 'Location', 'Best');
-saveas(gcf, 'nozzle_full.pdf');
+title('Converging-Diverging Nozzle w/ Constant Enthalpy');
+legend('\rho', 'u', 'p', 'Location', 'Best');
+saveas(gcf, 'nozzle_constH.pdf');
 
 figure(2);
 semilogy(res);
-title('Residual: Converging-Diverging Nozzle');
-legend('\rho', 'u', 'e', 'Location', 'Best');
-saveas(gcf, 'nozzle_residual_full.pdf');
+title('Residual: Converging-Diverging Nozzle w/ Constant Enthalpy');
+legend('\rho', 'u', 'Location', 'Best');
+saveas(gcf, 'nozzle_residual_constH.pdf');
