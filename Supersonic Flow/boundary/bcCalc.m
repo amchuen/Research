@@ -1,4 +1,4 @@
-function BC_vals = bcCalc(GR, BC, fv, DIR, varargin)
+function BC_vals = bcCalc(GR, FL, BC, fv, DIR, varargin)
 
 % BC information stored at each location
 % BC.(DIR) contains...
@@ -28,7 +28,7 @@ function BC_vals = bcCalc(GR, BC, fv, DIR, varargin)
     elseif strcmp(BC.(DIR).physical, 'wall')
         BC_temp = gen_wallBC(GR, BC, fv, DIR);
     elseif strcmp(BC.(DIR).physical, 'outlet')
-        BC_temp = gen_outletBC(GR, BC, fv, DIR);
+        BC_temp = gen_outletBC(GR, FL, BC, fv, DIR);
     elseif strcmp(BC.(DIR).physical, 'farfield')
         BC_temp = gen_farfieldBC(GR, BC, fv, DIR);
     else
@@ -86,25 +86,10 @@ function BC_vals = gen_symBC(GR, BC, FF, DIR)
 
 end
 
-function BC_vals = gen_outletBC(GR, BC, FF, DIR)
+function BC_vals = gen_outletBC(GR, FL, BC, FF, DIR)
     BC_vals = [];
     % values inputted into BC will represent the outlet condition
     % note that the outlet condition is calculated assuming constant spacing
-%     switch DIR
-%         case 'W'
-%             BC_vals = FF(:,2,:);
-% 
-%         case 'E'                
-%             BC_vals = FF(:,end-1,:);
-% 
-%         case 'N' 
-%             BC_vals = FF(end-1,:,:);
-%             
-%         case 'S'
-%             BC_vals = FF(2,:,:);
-%             
-%     end
-
     switch DIR
         case 'W'
             indTan = reshape(strcmp(BC.(DIR).varType, 'v1'),1,1,size(FF,3)) + reshape(strcmp(BC.(DIR).varType, 'v2'),1,1,size(FF,3)) + reshape(strcmp(BC.(DIR).varType, 's'),1,1,size(FF,3));
@@ -119,6 +104,24 @@ function BC_vals = gen_outletBC(GR, BC, FF, DIR)
             indPhi = reshape(strcmp(BC.(DIR).varType, 'phi'),1,1,size(FF,3)); % checks for potential
 %             BC_vals = FF(:,end-1,:).*indTan + (2.*FF(:,end,:) - FF(:,end-1,:)).*indPhi;
             BC_vals = (4/3.*FF(:,end,:) - 1/3.*FF(:,end-1,:)).*indTan + (2.*FF(:,end,:) - FF(:,end-1,:)).*indPhi;
+            
+            if strcmp(BC.(DIR).exitCond{1}, 'p') % check if exit pressure is defined
+                if any(strcmp(BC.(DIR).varName, '\rho e')) % full Euler case
+                    indE = reshape(strcmp(BC.(DIR).varName, '\rho e'),1,1,size(FF,3));
+                    indV1 = reshape(strcmp(BC.(DIR).varType, 'v1'),1,1,size(FF,3));
+                    indV2 = reshape(strcmp(BC.(DIR).varType, 'v2'),1,1,size(FF,3));
+                    indRho = reshape(strcmp(BC.(DIR).varName, '\rho'),1,1,size(FF,3));
+                    BC_vals(:,:,indE) = BC.(DIR).exitCond{2}./(FL.gam-1) + 0.5.*(BC_vals(:,:,indV1).^2 + BC_vals(:,:,indV2).^2)./BC_vals(:,:,indRho);
+                    
+                elseif any(strcmp(BC.(DIR).varName, '\rho u')) % isentropic euler case
+                    indRho = reshape(strcmp(BC.(DIR).varName, '\rho'),1,1,size(FF,3));
+                    BC_vals(:,:,indRho) = ((FL.gam.*FL.M0.*BC.(DIR).exitCond{2}).^(1/FL.gam));
+                end
+                
+%             else -> maybe define this for exit density or exit velocity?
+                
+                
+            end
 
         case 'N' 
             BC_vals = FF(end,:,:);
@@ -226,9 +229,10 @@ function BC_vals = gen_wallBC(GR, BC, FF, DIR)
             indScalar = reshape(strcmp(BC.(DIR).varType, 's'),1,1,size(FF,3));
             indPhi = reshape(strcmp(BC.(DIR).varType, 'phi'),1,1,size(FF,3)); % checks for potential
             indNorm = reshape(strcmp(BC.(DIR).varType, 'v1'),1,1,size(FF,3));
-            BC_vals = 2.*(  FF(end,:,:).*(indTan+indScalar)...
+            indRho = reshape(strcmp(BC.N.varName, '\rho'),1,1,size(FF,3));
+            BC_vals = (  FF(end,:,:).*(indTan+indScalar+indPhi-indNorm)...
                             - GR.dy.*reshape(BC.(DIR).dydx,1,size(FF,2)).*indPhi...
-                            + reshape(BC.(DIR).dydx,1,size(FF,2)).*FF(end,:,indTan).*indNorm) - FF(end,:,:);
+                            + 2.*FF(end,:,indRho).*reshape(BC.(DIR).dydx,1,size(FF,2)).*indNorm);... - FF(1,:,:);
 
         case 'S'
             indTan = reshape(strcmp(BC.(DIR).varType, 'v2'),1,1,size(FF,3));

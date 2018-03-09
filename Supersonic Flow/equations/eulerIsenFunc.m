@@ -33,8 +33,8 @@ if GR.isPolar
 
     fvOUT = FF_2 + GG_1 + PP_1 + PP_2 + C_1 + C_2;
 else
-    EEx = [bcCalc(GR,BC,EE,'W'), EE, bcCalc(GR,BC,EE,'E')];
-    EEy = [bcCalc(GR,BC,EE,'S'); EE; bcCalc(GR,BC,EE,'N')];
+    EEx = [bcCalc(GR,FL,BC,EE,'W'), EE, bcCalc(GR,FL,BC,EE,'E')];
+    EEy = [bcCalc(GR,FL,BC,EE,'S'); EE; bcCalc(GR,FL,BC,EE,'N')];
     
     FF = indRho.*EEx(:,:,indP2) + indP2.*(EEx(:,:,indP2).^2./EEx(:,:,indRho) + (EEx(:,:,indRho).^FL.gam)./(FL.gam.*FL.M0^2)) + indP1.*(EEx(:,:,indP1).*EEx(:,:,indP2)./EEx(:,:,indRho));
     GG = indRho.*EEy(:,:,indP1) + indP1.*(EEy(:,:,indP1).^2./EEy(:,:,indRho) + (EEy(:,:,indRho).^FL.gam)./(FL.gam.*FL.M0^2)) + indP2.*(EEy(:,:,indP1).*EEy(:,:,indP2)./EEy(:,:,indRho));
