@@ -7,7 +7,7 @@ clear;
 dy = 0.0025;
 dx = 0.001;
 
-y_max = 1;
+y_max = 0.5;
 x_max = 1;%7+20*dx;
 x_min = 0.5;%-7-39*dx; %(-19*dx);
 x_vals = x_min:dx:x_max;
