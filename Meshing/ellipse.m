@@ -7,33 +7,35 @@ tol = 1e-4;
 omega = 1; % change later when norms are easier to find?
 cBC = 0.5;
 
-%% Initialize Computational Grid and Physical Grid
-
-% Nozzle Function
-nozzCoeffs = [2 -2 1]';
+%% Initialize Computational Grid
 
 % Computational Grid
-nZeta = 101; % dZ = 1
-nEta = 201; % dE = 1
+nZeta = 51; % dZ = 1
+nEta = 51; % dE = 1
 [ZZ, EE] = meshgrid(linspace(0,1,nZeta), linspace(0,1,nEta));
 dZ = 1/(nZeta-1);
 dE = 1/(nEta-1);
 
+%% Draw Lines
 % Physical Grid -> boundary conditions
+bAxis = 1;
+aAxis = 2;
+rEllipse = @(theta) aAxis*bAxis./sqrt((bAxis.*(cos(theta))).^2 + (aAxis.*sin(theta)).^2);
+rMax = 5;
 xRange = [0.5, 1];
-xS = equalCurveDist(nozzCoeffs, xRange, nZeta);
-xW = zeros(nEta, 1);
-xN = xS;
-xE = xS(end).*ones(nEta, 1);
-% xN = linspace(xW(end),xE(end), nZeta);
-
+xS = rEllipse(linspace(0,pi,nZeta)).*cos(linspace(0,pi,nZeta));
+xN = rMax.*cos(linspace(0,pi,nZeta));
+xW = linspace(xS(1), xN(1), nEta);
+xE = linspace(xS(end), xN(end), nEta);
 
 % yS = zeros(size(xS));
-yN = polyval(nozzCoeffs, xN);
-yS = -yN;
+yN = rMax.*sin(linspace(0,pi,nZeta));
+yS = rEllipse(linspace(0,pi,nZeta)).*sin(linspace(0,pi,nZeta));
 % yN = ones(size(xN));
 yW = linspace(yS(1), yN(1), nEta);
 yE = linspace(yS(end), yN(end), nEta);
+
+%% Build Physical Grid
 
 UU = cat(3, ZZ, EE, zeros(size(ZZ)), zeros(size(EE))); % [X, Y, P, Q]
 for i = 1:size(UU,2) % march west to east, intialize X and Y
@@ -53,21 +55,10 @@ for i = 1:size(UU,2)
     end
 end
 
-figure(1);hold on;
-quiver(xN',yN',normU(:,1), normU(:,2)); hold on;
-quiver(xS',yS',normL(:,1), normL(:,2));
-
-% Fit a Cubic Across y
-coeffMat = zeros(4,size(UU,2));
-for i = 1:size(UU,2)
-    Amat = [ yS(i)^3, yS(i)^2, yS(i), 1; 3*yS(i)^2, 2*(yS(i)), 1, 0;...
-            yN(i)^3, yN(i)^2, yN(i), 1; 3*yN(i)^2, 2*(yN(i)), 1, 0];
-    bVec = [xS(i), normL(i,1)/normL(i,2), xN(i), normU(i,1)/normU(i,2)]';
-    coeffMat(:,i) = Amat\bVec;
-    UU(:,i,2) = equalCurveDist(coeffMat(:,i), [yS(i), yN(i)], length(UU(:,i,2)));
-    UU(:,i,1) = polyval(coeffMat(:,i), UU(:,i,2));
-end
-
+% figure(1);hold on;
+% quiver(xN',yN',normU(:,1), normU(:,2)); hold on;
+% quiver(xS',yS',normL(:,1), normL(:,2));
+% 
 % close all;
 figure(1);
 plot(UU(:,:,1), UU(:,:,2), 'b-', UU(:,:,1)', UU(:,:,2)', 'b-'); axis equal;
@@ -108,12 +99,12 @@ corr = 1;
 while res(end) > tol && corr(end) > tol
     UUold = UU(:,:,1:2);
     %% Sweep through field 
-    if mod(length(res),2)
-        iSweep = 2:(size(UU,2)-1);
-    else
-        iSweep = fliplr(2:(size(UU,2)-1));
-    end
-%     iSweep = 2:(size(UU,2)-1);
+%     if mod(length(res),2)
+%         iSweep = 2:(size(UU,2)-1);
+%     else
+%         iSweep = fliplr(2:(size(UU,2)-1));
+%     end
+    iSweep = 2:(size(UU,2)-1);
     
     for i = iSweep
                
@@ -121,11 +112,28 @@ while res(end) > tol && corr(end) > tol
         if (i == 2) || (i == (size(UU,2)-1))
             if i == 2
                 ind = i-1;
-                dZdx_dZdy = [(-1.5.*ZZ(2:end-1,1)+2.*ZZ(2:end-1,2)-0.5.*ZZ(2:end-1,3))./(-1.5.*UU(2:end-1,1,1)+2.*UU(2:end-1,2,1)-0.5.*UU(2:end-1,3,1)),... dZ/dx
-                            (ZZ(3:end,1) - ZZ(1:end-2,1))./(UU(3:end,1,2)-UU(1:end-2,1,2))]; % dZ/dy
+%                 dZdx_dZdy = [(-1.5.*ZZ(2:end-1,1)+2.*ZZ(2:end-1,2)-0.5.*ZZ(2:end-1,3))./(-1.5.*UU(2:end-1,1,1)+2.*UU(2:end-1,2,1)-0.5.*UU(2:end-1,3,1)),... dZ/dx
+%                             (ZZ(3:end,1) - ZZ(1:end-2,1))./(UU(3:end,1,2)-UU(1:end-2,1,2))]; % dZ/dy
                         
-                dEdx_dEdy = [(-1.5.*EE(2:end-1,1)+2.*EE(2:end-1,2)-0.5.*EE(2:end-1,3))./(-1.5.*UU(2:end-1,1,1)+2.*UU(2:end-1,2,1)-0.5.*UU(2:end-1,3,1)),... dE/dx
-                            (EE(3:end,1) - EE(1:end-2,1))./(UU(3:end,1,2)-UU(1:end-2,1,2))]; % dE/dy
+                if any(abs(UU(3:end,1,2)-UU(1:end-2,1,2))< eps)
+                    if any(abs(EE(3:end,1)-EE(1:end-2,1))< eps) 
+                        dEdx_dEdy = [(-1.5.*EE(2:end-1,1)+2.*EE(2:end-1,2)-0.5.*EE(2:end-1,3))./(-1.5.*UU(2:end-1,1,1)+2.*UU(2:end-1,2,1)-0.5.*UU(2:end-1,3,1)),... dE/dx
+                                    zeros(size(EE(2:end-1,1)))]; % dE/dy
+                    else
+                       error('MESH NOT COMPATIBLE\n'); 
+                    end
+                elseif any(abs(-1.5.*UU(2:end-1,1,1)+2.*UU(2:end-1,2,1)-0.5.*UU(2:end-1,3,1))< eps) 
+                    if any(abs(-1.5.*EE(2:end-1,1)+2.*EE(2:end-1,2)-0.5.*EE(2:end-1,3))< eps)
+                        dEdx_dEdy = [zeros(size(EE(2:end-1,1))),... dE/dx
+                                    (EE(3:end,1) - EE(1:end-2,1))./(UU(3:end,1,2)-UU(1:end-2,1,2))]; % dE/dy
+                    else
+                       error('MESH NOT COMPATIBLE\n'); 
+                    end
+                    
+                else
+                    dEdx_dEdy = [(-1.5.*EE(2:end-1,1)+2.*EE(2:end-1,2)-0.5.*EE(2:end-1,3))./(-1.5.*UU(2:end-1,1,1)+2.*UU(2:end-1,2,1)-0.5.*UU(2:end-1,3,1)),... dE/dx
+                                (EE(3:end,1) - EE(1:end-2,1))./(UU(3:end,1,2)-UU(1:end-2,1,2))]; % dE/dy
+                end
                         
                 normal = [(-(UU(3:end,1,2)-UU(1:end-2,1,2))./sqrt((UU(3:end,1,2)-UU(1:end-2,1,2)).^2+(UU(3:end,1,1)-UU(1:end-2,1,1)).^2)),... % n_x
                             (UU(3:end,1,1)-UU(1:end-2,1,1))./sqrt((UU(3:end,1,2)-UU(1:end-2,1,2)).^2+(UU(3:end,1,1)-UU(1:end-2,1,1)).^2)]; % n_y 
@@ -147,16 +155,33 @@ while res(end) > tol && corr(end) > tol
             
             elseif i == (size(UU,2)-1)
                 ind = i+1;             
-                dZdx_dZdy = [(1.5.*ZZ(2:end-1,end)-2.*ZZ(2:end-1,end-1)+0.5.*ZZ(2:end-1,end-2))./(1.5.*UU(2:end-1,end,1)-2.*UU(2:end-1,end-1,1)+0.5.*UU(2:end-1,end-2,1)),... dZ/dx
-                    (ZZ(3:end,end) - ZZ(1:end-2,end))./(UU(3:end,end,2)-UU(1:end-2,end,2))]; % dZ/dy  
+%                 dZdx_dZdy = [(1.5.*ZZ(2:end-1,end)-2.*ZZ(2:end-1,end-1)+0.5.*ZZ(2:end-1,end-2))./(1.5.*UU(2:end-1,end,1)-2.*UU(2:end-1,end-1,1)+0.5.*UU(2:end-1,end-2,1)),... dZ/dx
+%                     (ZZ(3:end,end) - ZZ(1:end-2,end))./(UU(3:end,end,2)-UU(1:end-2,end,2))]; % dZ/dy  
+
+                if any(abs(UU(3:end,end,2)-UU(1:end-2,end,2))< eps)
+                    if any((EE(3:end,end) - EE(1:end-2,end))< eps)
+                        dEdx_dEdy = [(1.5.*EE(2:end-1,end)-2.*EE(2:end-1,end-1)+0.5.*EE(2:end-1,end-2))./(1.5.*UU(2:end-1,end,1)-2.*UU(2:end-1,end-1,1)+0.5.*UU(2:end-1,end-2,1)),... dE/dx
+                                    zeros(size(EE(2:end-1,1)))]; % dE/dy
+                    else
+                       error('MESH NOT COMPATIBLE\n'); 
+                    end
+                elseif any(abs(1.5.*UU(2:end-1,end,1)-2.*UU(2:end-1,end-1,1)+0.5.*UU(2:end-1,end-2,1))< eps)
+                    if any(abs(1.5.*EE(2:end-1,end)-2.*EE(2:end-1,end-1)+0.5.*EE(2:end-1,end-2))< eps)
+                        dEdx_dEdy = [zeros(size(EE(2:end-1,1))),... dE/dx
+                                    (EE(3:end,end) - EE(1:end-2,end))./(UU(3:end,end,2)-UU(1:end-2,end,2))]; % dE/dy
+                    else
+                       error('MESH NOT COMPATIBLE\n'); 
+                    end
+                    
+                else
+                    dEdx_dEdy = [(1.5.*EE(2:end-1,end)-2.*EE(2:end-1,end-1)+0.5.*EE(2:end-1,end-2))./(1.5.*UU(2:end-1,end,1)-2.*UU(2:end-1,end-1,1)+0.5.*UU(2:end-1,end-2,1)),... dE/dx
+                                    (EE(3:end,end) - EE(1:end-2,end))./(UU(3:end,end,2)-UU(1:end-2,end,2))]; % dE/dy
+                end
                 
-                dEdx_dEdy = [(1.5.*EE(2:end-1,end)-2.*EE(2:end-1,end-1)+0.5.*EE(2:end-1,end-2))./(1.5.*UU(2:end-1,end,1)-2.*UU(2:end-1,end-1,1)+0.5.*UU(2:end-1,end-2,1)),... dE/dx
-                    (EE(3:end,end) - EE(1:end-2,end))./(UU(3:end,end,2)-UU(1:end-2,end,2))]; % dE/dy
-                
-%                 normal = -[(-(UU(3:end,end,2)-UU(1:end-2,end,2))./sqrt((UU(3:end,end,2)-UU(1:end-2,end,2)).^2+(UU(3:end,end,1)-UU(1:end-2,end,1)).^2)),... % n_x
-%                             (UU(3:end,end,1)-UU(1:end-2,end,1))./sqrt((UU(3:end,end,2)-UU(1:end-2,end,2)).^2+(UU(3:end,end,1)-UU(1:end-2,end,1)).^2)]; % n_y
-                normal = -[-1./sqrt(1+polyval((3:-1:1)'.*coeffMat(1:end-1,end),UU(:,end,2)).^2), polyval((3:-1:1)'.*coeffMat(1:end-1,end),UU(:,end,2))./sqrt(1+polyval((3:-1:1)'.*coeffMat(1:end-1,end),UU(:,end,2)).^2)];
-                normal = normal(2:end-1,:);
+                normal = [(-(UU(3:end,end,2)-UU(1:end-2,end,2))./sqrt((UU(3:end,end,2)-UU(1:end-2,end,2)).^2+(UU(3:end,end,1)-UU(1:end-2,end,1)).^2)),... % n_x
+                            (UU(3:end,end,1)-UU(1:end-2,end,1))./sqrt((UU(3:end,end,2)-UU(1:end-2,end,2)).^2+(UU(3:end,end,1)-UU(1:end-2,end,1)).^2)]; % n_y
+%                 normal = -[-1./sqrt(1+polyval((3:-1:1)'.*coeffMat(1:end-1,end),UU(:,end,2)).^2), polyval((3:-1:1)'.*coeffMat(1:end-1,end),UU(:,end,2))./sqrt(1+polyval((3:-1:1)'.*coeffMat(1:end-1,end),UU(:,end,2)).^2)];
+%                 normal = normal(2:end-1,:);
                         
                 xZeta_WE =-(-1.5.*UU(2:end-1,end,1)+2.*UU(2:end-1,end-1,1)-0.5.*UU(2:end-1,end-2,1))./dZ;
                 yZeta_WE =-(-1.5.*UU(2:end-1,end,2)+2.*UU(2:end-1,end-1,2)-0.5.*UU(2:end-1,end-2,2))./dZ;
@@ -201,11 +226,10 @@ while res(end) > tol && corr(end) > tol
                 +gamma(1).*((UU(3,i,1:2)-2.*UU(2,i,1:2)+UU(1,i,1:2)))./(dE^2)  )./(jac(1)^2);
 
         % calculate Normals
-%         normalN = [(-(UU(end,i+1,2)-UU(end,i-1,2))./sqrt((UU(end,i+1,2)-UU(end,i-1,2)).^2+(UU(end,i+1,1)-UU(end,i-1,1))^2)),...
-%                     ((UU(end,i+1,1)-UU(end,i-1,1))./sqrt((UU(end,i+1,2)-UU(end,i-1,2)).^2+(UU(end,i+1,1)-UU(end,i-1,1)).^2))];
-%         normalS = -[(-(UU(1,i+1,2)-UU(1,i-1,2))./sqrt((UU(1,i+1,2)-UU(1,i-1,2)).^2+(UU(1,i+1,1)-UU(1,i-1,1))^2)),...
-%                     ((UU(1,i+1,1)-UU(1,i-1,1))./sqrt((UU(1,i+1,2)-UU(1,i-1,2)).^2+(UU(1,i+1,1)-UU(1,i-1,1)).^2))];
-        normalN = normU(i,:); normalS = -normL(i,:);
+        normalN = [(-(UU(end,i+1,2)-UU(end,i-1,2))./sqrt((UU(end,i+1,2)-UU(end,i-1,2)).^2+(UU(end,i+1,1)-UU(end,i-1,1))^2)),...
+                    ((UU(end,i+1,1)-UU(end,i-1,1))./sqrt((UU(end,i+1,2)-UU(end,i-1,2)).^2+(UU(end,i+1,1)-UU(end,i-1,1)).^2))];
+        normalS = [(-(UU(1,i+1,2)-UU(1,i-1,2))./sqrt((UU(1,i+1,2)-UU(1,i-1,2)).^2+(UU(1,i+1,1)-UU(1,i-1,1))^2)),...
+                    ((UU(1,i+1,1)-UU(1,i-1,1))./sqrt((UU(1,i+1,2)-UU(1,i-1,2)).^2+(UU(1,i+1,1)-UU(1,i-1,1)).^2))];
 
         % North Boundary
         dZdx_dZdy_N = [(ZZ(end,i+1) - ZZ(end,i-1))/(UU(end,i+1,1) - UU(end,i-1,1)), (1.5*ZZ(end,i)-2*ZZ(end-1,i)+0.5*ZZ(end-2,i))/(1.5*UU(end,i,2)-2*UU(end-1,i,2)+0.5*UU(end-2,i,2))];
@@ -241,7 +265,7 @@ while res(end) > tol && corr(end) > tol
     hold on;
     plot(UU([1 size(UU,1)],:,1)', UU([1 size(UU,1)],:,2)', 'b-'); axis equal;
 %     normExit = -[-1./sqrt(1+polyval((3:-1:1)'.*coeffMat(1:end-1,end),UU(:,end,2)).^2), polyval((3:-1:1)'.*coeffMat(1:end-1,end),UU(:,end,2))./sqrt(1+polyval((3:-1:1)'.*coeffMat(1:end-1,end),UU(:,end,2)).^2)];
-    quiver(xN',yN', normU(:,1), normU(:,2));
+%     quiver(xN',yN', normU(:,1), normU(:,2));
 %     quiver(UU(:,end,1), UU(:,end,2), normExit(:,1), normExit(:,2)); hold off;
     
 %     figure(2);
