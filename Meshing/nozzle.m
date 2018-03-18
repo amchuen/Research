@@ -13,15 +13,18 @@ cBC = 0.5;
 nozzCoeffs = [2 -2 1]';
 
 % Computational Grid
-nZeta = 101; % dZ = 1
-nEta = 201; % dE = 1
+nZeta = 81; % dZ = 1
+nEta = 41; % dE = 1
+wt = 0.25;
 [ZZ, EE] = meshgrid(linspace(0,1,nZeta), linspace(0,1,nEta));
 dZ = 1/(nZeta-1);
 dE = 1/(nEta-1);
 
 % Physical Grid -> boundary conditions
 xRange = [0.5, 1];
-xS = equalCurveDist(nozzCoeffs, xRange, nZeta);
+xS = equalCurveDist(nozzCoeffs, xRange, wt.*(nZeta-1)+1);
+dx = xS(end) - xS(end-1);
+xS = [xS(1:end-1), linspace(xS(end), 4, (1-wt).*(nZeta-1)+1)];
 xW = zeros(nEta, 1);
 xN = xS;
 xE = xS(end).*ones(nEta, 1);
@@ -29,7 +32,7 @@ xE = xS(end).*ones(nEta, 1);
 
 
 % yS = zeros(size(xS));
-yN = polyval(nozzCoeffs, xN);
+yN = [polyval(nozzCoeffs, xN(xN<1)), ones(size(xN(xN>=1)))];
 yS = -yN;
 % yN = ones(size(xN));
 yW = linspace(yS(1), yN(1), nEta);
@@ -39,8 +42,8 @@ UU = cat(3, ZZ, EE, zeros(size(ZZ)), zeros(size(EE))); % [X, Y, P, Q]
 for i = 1:size(UU,2) % march west to east, intialize X and Y
    UU(:,i,1:2) = cat(3, linspace(xS(i), xN(i), nEta), linspace(yS(i), yN(i), nEta));
 end
-
-for i = 1:size(UU,2)
+coeffMat = zeros(4,size(UU,2));
+for i = size(UU,2):size(UU,2)
     if i == 1
         normU(i,:) = [-(-1.5*yN(i)+2*yN(i+1)-0.5*yN(i+2)),(-1.5*xN(i)+2*xN(i+1)-0.5*xN(i+2))]./sqrt((-1.5*yN(i)+2*yN(i+1)-0.5*yN(i+2))^2+(-1.5*xN(i)+2*xN(i+1)-0.5*xN(i+2))^2);
         normL(i,:) = [-(-1.5*yS(i)+2*yS(i+1)-0.5*yS(i+2)),(-1.5*xS(i)+2*xS(i+1)-0.5*xS(i+2))]./sqrt((-1.5*yS(i)+2*yS(i+1)-0.5*yS(i+2))^2+(-1.5*xS(i)+2*xS(i+1)-0.5*xS(i+2))^2);
@@ -51,15 +54,9 @@ for i = 1:size(UU,2)
         normU(i,:) = [-(yN(i+1)-yN(i-1)),(xN(i+1)-xN(i-1))]./sqrt((yN(i+1)-yN(i-1))^2+(xN(i+1)-xN(i-1))^2);
         normL(i,:) = [-(yS(i+1)-yS(i-1)),(xS(i+1)-xS(i-1))]./sqrt((yS(i+1)-yS(i-1))^2+(xS(i+1)-xS(i-1))^2);
     end
-end
 
-figure(1);hold on;
-quiver(xN',yN',normU(:,1), normU(:,2)); hold on;
-quiver(xS',yS',normL(:,1), normL(:,2));
+    % Fit a Cubic Across y
 
-% Fit a Cubic Across y
-coeffMat = zeros(4,size(UU,2));
-for i = 1:size(UU,2)
     Amat = [ yS(i)^3, yS(i)^2, yS(i), 1; 3*yS(i)^2, 2*(yS(i)), 1, 0;...
             yN(i)^3, yN(i)^2, yN(i), 1; 3*yN(i)^2, 2*(yN(i)), 1, 0];
     bVec = [xS(i), normL(i,1)/normL(i,2), xN(i), normU(i,1)/normU(i,2)]';
@@ -153,10 +150,10 @@ while res(end) > tol && corr(end) > tol
                 dEdx_dEdy = [(1.5.*EE(2:end-1,end)-2.*EE(2:end-1,end-1)+0.5.*EE(2:end-1,end-2))./(1.5.*UU(2:end-1,end,1)-2.*UU(2:end-1,end-1,1)+0.5.*UU(2:end-1,end-2,1)),... dE/dx
                     (EE(3:end,end) - EE(1:end-2,end))./(UU(3:end,end,2)-UU(1:end-2,end,2))]; % dE/dy
                 
-%                 normal = -[(-(UU(3:end,end,2)-UU(1:end-2,end,2))./sqrt((UU(3:end,end,2)-UU(1:end-2,end,2)).^2+(UU(3:end,end,1)-UU(1:end-2,end,1)).^2)),... % n_x
-%                             (UU(3:end,end,1)-UU(1:end-2,end,1))./sqrt((UU(3:end,end,2)-UU(1:end-2,end,2)).^2+(UU(3:end,end,1)-UU(1:end-2,end,1)).^2)]; % n_y
-                normal = -[-1./sqrt(1+polyval((3:-1:1)'.*coeffMat(1:end-1,end),UU(:,end,2)).^2), polyval((3:-1:1)'.*coeffMat(1:end-1,end),UU(:,end,2))./sqrt(1+polyval((3:-1:1)'.*coeffMat(1:end-1,end),UU(:,end,2)).^2)];
-                normal = normal(2:end-1,:);
+                normal = -[(-(UU(3:end,end,2)-UU(1:end-2,end,2))./sqrt((UU(3:end,end,2)-UU(1:end-2,end,2)).^2+(UU(3:end,end,1)-UU(1:end-2,end,1)).^2)),... % n_x
+                            (UU(3:end,end,1)-UU(1:end-2,end,1))./sqrt((UU(3:end,end,2)-UU(1:end-2,end,2)).^2+(UU(3:end,end,1)-UU(1:end-2,end,1)).^2)]; % n_y
+%                 normal = -[-1./sqrt(1+polyval((3:-1:1)'.*coeffMat(1:end-1,end),UU(:,end,2)).^2), polyval((3:-1:1)'.*coeffMat(1:end-1,end),UU(:,end,2))./sqrt(1+polyval((3:-1:1)'.*coeffMat(1:end-1,end),UU(:,end,2)).^2)];
+%                 normal = normal(2:end-1,:);
                         
                 xZeta_WE =-(-1.5.*UU(2:end-1,end,1)+2.*UU(2:end-1,end-1,1)-0.5.*UU(2:end-1,end-2,1))./dZ;
                 yZeta_WE =-(-1.5.*UU(2:end-1,end,2)+2.*UU(2:end-1,end-1,2)-0.5.*UU(2:end-1,end-2,2))./dZ;
@@ -201,11 +198,11 @@ while res(end) > tol && corr(end) > tol
                 +gamma(1).*((UU(3,i,1:2)-2.*UU(2,i,1:2)+UU(1,i,1:2)))./(dE^2)  )./(jac(1)^2);
 
         % calculate Normals
-%         normalN = [(-(UU(end,i+1,2)-UU(end,i-1,2))./sqrt((UU(end,i+1,2)-UU(end,i-1,2)).^2+(UU(end,i+1,1)-UU(end,i-1,1))^2)),...
-%                     ((UU(end,i+1,1)-UU(end,i-1,1))./sqrt((UU(end,i+1,2)-UU(end,i-1,2)).^2+(UU(end,i+1,1)-UU(end,i-1,1)).^2))];
-%         normalS = -[(-(UU(1,i+1,2)-UU(1,i-1,2))./sqrt((UU(1,i+1,2)-UU(1,i-1,2)).^2+(UU(1,i+1,1)-UU(1,i-1,1))^2)),...
-%                     ((UU(1,i+1,1)-UU(1,i-1,1))./sqrt((UU(1,i+1,2)-UU(1,i-1,2)).^2+(UU(1,i+1,1)-UU(1,i-1,1)).^2))];
-        normalN = normU(i,:); normalS = -normL(i,:);
+        normalN = [(-(UU(end,i+1,2)-UU(end,i-1,2))./sqrt((UU(end,i+1,2)-UU(end,i-1,2)).^2+(UU(end,i+1,1)-UU(end,i-1,1))^2)),...
+                    ((UU(end,i+1,1)-UU(end,i-1,1))./sqrt((UU(end,i+1,2)-UU(end,i-1,2)).^2+(UU(end,i+1,1)-UU(end,i-1,1)).^2))];
+        normalS = -[(-(UU(1,i+1,2)-UU(1,i-1,2))./sqrt((UU(1,i+1,2)-UU(1,i-1,2)).^2+(UU(1,i+1,1)-UU(1,i-1,1))^2)),...
+                    ((UU(1,i+1,1)-UU(1,i-1,1))./sqrt((UU(1,i+1,2)-UU(1,i-1,2)).^2+(UU(1,i+1,1)-UU(1,i-1,1)).^2))];
+%         normalN = normU(i,:); normalS = -normL(i,:);
 
         % North Boundary
         dZdx_dZdy_N = [(ZZ(end,i+1) - ZZ(end,i-1))/(UU(end,i+1,1) - UU(end,i-1,1)), (1.5*ZZ(end,i)-2*ZZ(end-1,i)+0.5*ZZ(end-2,i))/(1.5*UU(end,i,2)-2*UU(end-1,i,2)+0.5*UU(end-2,i,2))];
