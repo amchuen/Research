@@ -2,18 +2,13 @@ clc;
 clear
 close all;
 
-%% Control Parameters
-tol = 1e-5;
-omega = 1; % change later when norms are easier to find?
-cBC = 1/20;
-
 %% Initialize Computational Grid and Physical Grid
 
 % Nozzle Function
 nozzCoeffs = [2 -2 1]';
 
 % Computational Grid
-nZeta = 25; % dZ = 1
+nZeta = 41; % dZ = 1
 nEta = 51; % dE = 1
 [ZZ, EE] = meshgrid(1:nZeta, 1:nEta);
 
@@ -96,44 +91,59 @@ plot(xN, yN, 'b-', xS, yS, 'b-');
 %     
 % end
 
-pchipMat = [2 1 0; 0 1 0; 0 0 1];
-for i = 2:size(UU,2) % march in x-direction
+% pchipMat = [2 1 0; 0 1 0; 0 0 1];
+% for i = 2:size(UU,2) % march in x-direction
+%     
+%     
+%     normB = [-1./sqrt(1+polyval((3:-1:1)'.*coeffMat(1:end-1,i-1),UU(:,i-1,2)).^2), polyval((3:-1:1)'.*coeffMat(1:end-1,i-1),UU(:,i-1,2))./sqrt(1+polyval((3:-1:1)'.*coeffMat(1:end-1,i-1),UU(:,i-1,2)).^2)];    
+%     normF = [-1./sqrt(1+polyval((3:-1:1)'.*coeffMat(1:end-1,i),UU(:,i,2)).^2), polyval((3:-1:1)'.*coeffMat(1:end-1,i),UU(:,i,2))./sqrt(1+polyval((3:-1:1)'.*coeffMat(1:end-1,i),UU(:,i,2)).^2)];
+%     deltaX = UU(:,i,1) - UU(:,i-1,1);
+%     if i == 6
+%        fprintf('stop here\n'); 
+%     end
+%     for ii = 2:(size(UU,1)-1) %2:(size(UU,1)-1) % march in y-direction
+%         xOld = UU(ii,i,1);
+%         coeffs = pchipMat\[deltaX(ii)*normF(ii,2)/normF(ii,1); deltaX(ii)*normB(ii,2)/normB(ii,1); UU(ii,i-1,2)];
+%         xNew = polyval(coeffMat(:,i),sum(coeffs));
+%         normF(ii,:) = [-1./sqrt(1+polyval((3:-1:1)'.*coeffMat(1:end-1,i),sum(coeffs)).^2), polyval((3:-1:1)'.*coeffMat(1:end-1,i),sum(coeffs))./sqrt(1+polyval((3:-1:1)'.*coeffMat(1:end-1,i),sum(coeffs)).^2)];
+%         res = abs(xNew - xOld);
+%         
+%         while res(end) > 1e-5
+%             xOld = xNew;
+%             deltaX(ii) = xOld - UU(ii,i-1,1);
+%             coeffs = pchipMat\[deltaX(ii)*normF(ii,2)/normF(ii,1); deltaX(ii)*normB(ii,2)/normB(ii,1); UU(ii,i-1,2)];
+%             xNew = polyval(coeffMat(:,i),sum(coeffs));
+%             normF(ii,:) = [-1./sqrt(1+polyval((3:-1:1)'.*coeffMat(1:end-1,i),sum(coeffs)).^2), polyval((3:-1:1)'.*coeffMat(1:end-1,i),sum(coeffs))./sqrt(1+polyval((3:-1:1)'.*coeffMat(1:end-1,i),sum(coeffs)).^2)];
+%             res(end+1) = abs(xNew - xOld);
+%         end
+%         
+%         deltaX(ii) = xNew - UU(ii,i-1,1);
+%         coeffs = pchipMat\[deltaX(ii)*normF(ii,2)/normF(ii,1); deltaX(ii)*normB(ii,2)/normB(ii,1); UU(ii,i-1,2)];
+%         UU(ii,i,1) = xNew;
+%         UU(ii,i,2) = sum(coeffs);
+%         xFit = linspace(UU(ii,i-1,1),UU(ii,i,1),11);
+%         pFit = polyval(coeffs, (xFit-UU(ii,i-1,1))./deltaX(ii));
+%         figure(1);hold on;
+%         plot(xFit, pFit, 'b-');
+%         drawnow;
+%     end
+%     
+% end
+
+pchipMat = [3 2 1 0; 0 0 1 0; 1 1 1 1; 0 0 0 1];
+normF = [-1./sqrt(1+polyval((3:-1:1)'.*coeffMat(1:end-1,end),UU(:,end,2)).^2), polyval((3:-1:1)'.*coeffMat(1:end-1,end),UU(:,end,2))./sqrt(1+polyval((3:-1:1)'.*coeffMat(1:end-1,end),UU(:,end,2)).^2)];
+normB = [-1./sqrt(1+polyval((3:-1:1)'.*coeffMat(1:end-1,1),UU(:,1,2)).^2), polyval((3:-1:1)'.*coeffMat(1:end-1,1),UU(:,1,2))./sqrt(1+polyval((3:-1:1)'.*coeffMat(1:end-1,1),UU(:,1,2)).^2)];
+deltaX = UU(:,end,1) - UU(:,1,1);
+for i = 2:(size(UU,1)-1) % march in y-direction
     
-    
-    normB = [-1./sqrt(1+polyval((3:-1:1)'.*coeffMat(1:end-1,i-1),UU(:,i-1,2)).^2), polyval((3:-1:1)'.*coeffMat(1:end-1,i-1),UU(:,i-1,2))./sqrt(1+polyval((3:-1:1)'.*coeffMat(1:end-1,i-1),UU(:,i-1,2)).^2)];    
-    normF = [-1./sqrt(1+polyval((3:-1:1)'.*coeffMat(1:end-1,i),UU(:,i,2)).^2), polyval((3:-1:1)'.*coeffMat(1:end-1,i),UU(:,i,2))./sqrt(1+polyval((3:-1:1)'.*coeffMat(1:end-1,i),UU(:,i,2)).^2)];
-    deltaX = UU(:,i,1) - UU(:,i-1,1);
-    if i == 6
-       fprintf('stop here\n'); 
-    end
-    for ii = 2:(size(UU,1)-1) %2:(size(UU,1)-1) % march in y-direction
-        xOld = UU(ii,i,1);
-        coeffs = pchipMat\[deltaX(ii)*normF(ii,2)/normF(ii,1); deltaX(ii)*normB(ii,2)/normB(ii,1); UU(ii,i-1,2)];
-        xNew = polyval(coeffMat(:,i),sum(coeffs));
-        normF(ii,:) = [-1./sqrt(1+polyval((3:-1:1)'.*coeffMat(1:end-1,i),sum(coeffs)).^2), polyval((3:-1:1)'.*coeffMat(1:end-1,i),sum(coeffs))./sqrt(1+polyval((3:-1:1)'.*coeffMat(1:end-1,i),sum(coeffs)).^2)];
-        res = abs(xNew - xOld);
-        
-        while res(end) > 1e-5
-            xOld = xNew;
-            deltaX(ii) = xOld - UU(ii,i-1,1);
-            coeffs = pchipMat\[deltaX(ii)*normF(ii,2)/normF(ii,1); deltaX(ii)*normB(ii,2)/normB(ii,1); UU(ii,i-1,2)];
-            xNew = polyval(coeffMat(:,i),sum(coeffs));
-            normF(ii,:) = [-1./sqrt(1+polyval((3:-1:1)'.*coeffMat(1:end-1,i),sum(coeffs)).^2), polyval((3:-1:1)'.*coeffMat(1:end-1,i),sum(coeffs))./sqrt(1+polyval((3:-1:1)'.*coeffMat(1:end-1,i),sum(coeffs)).^2)];
-            res(end+1) = abs(xNew - xOld);
-        end
-        
-        deltaX(ii) = xNew - UU(ii,i-1,1);
-        coeffs = pchipMat\[deltaX(ii)*normF(ii,2)/normF(ii,1); deltaX(ii)*normB(ii,2)/normB(ii,1); UU(ii,i-1,2)];
-        UU(ii,i,1) = xNew;
-        UU(ii,i,2) = sum(coeffs);
-        xFit = linspace(UU(ii,i-1,1),UU(ii,i,1),11);
-        pFit = polyval(coeffs, (xFit-UU(ii,i-1,1))./deltaX(ii));
-        figure(1);hold on;
-        plot(xFit, pFit, 'b-');
-        drawnow;
-    end
+    coeffs = pchipMat\[deltaX(i)*normF(i,2)/normF(i,1); deltaX(i)*normB(i,2)/normB(i,1); UU(i,end,2); UU(i,1,2)];
+    xFit = linspace(UU(i,1,1),UU(i,end,1),11);
+    pFit = polyval(coeffs, (xFit-UU(i,1,1))./deltaX(i));
+    figure(1);hold on;
+    plot(xFit, pFit, 'b-');
+    drawnow;
     
 end
 
 figure(1);
-saveas(gcf, 'algebraic_mesh_higherRes', 'pdf');
+saveas(gcf, 'cubic_mesh_higherRes', 'pdf');

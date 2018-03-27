@@ -24,6 +24,12 @@ res = ones(2,size(UU,3)); %resCalc(GR, FL, BC, func, epsFunc, UU(:,:,:,end));
 maxRes = max(res,[],1);
 time = [-GR.dt, 0];
 
+% Initialize Plots for Residual
+figure(1);
+resPlot = semilogy(res);
+legend(BC.N.varName, 'Location', 'Best');
+title(['t = ' num2str(time(end))]);
+
 %% Run Simulation
 dtLast = GR.dt;
 while norm(res(end,:)./maxRes) > GR.tol || time(end) < GR.tEnd
@@ -70,14 +76,10 @@ while norm(res(end,:)./maxRes) > GR.tol || time(end) < GR.tEnd
         fprintf('Current Residual: %0.5e\n', norm(res(end,:)));
     end
     
-    figure(1);
+    % Plot Residuals
     for iii = 1:size(res,2)
-        semilogy(1:size(res,1), res(:,iii));
-        hold on;
+        resPlot(iii).YData(end+1) = res(end,iii);
     end
-    legend(BC.N.varName, 'Location', 'Best');
-    title(['t = ' num2str(time(end))]);
-    hold off;
     drawnow;
     
     if size(res,1) < 5
