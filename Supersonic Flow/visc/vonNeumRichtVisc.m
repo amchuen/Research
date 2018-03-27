@@ -1,8 +1,8 @@
 function varargout = vonNeumRichtVisc(FF, GR, BC, FL, varargin)
 
-alpha = 0.25;
+alpha = 0.5;
 % power = 2;
-epsMin = 0.25*GR.dx*GR.dy;
+epsMin = GR.dx*GR.dy;
 DIRnames = {'N', 'S', 'E', 'W'};
 
 if ~isempty(varargin)
