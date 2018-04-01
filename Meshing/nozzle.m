@@ -13,28 +13,40 @@ cBC = 0.5;
 nozzCoeffs = [2 -2 1]';
 
 % Computational Grid
-nZeta = 81; % dZ = 1
-nEta = 41; % dE = 1
+nZeta = 41; % dZ = 1
+nEta = 51; % dE = 1
 wt = 0.25;
 [ZZ, EE] = meshgrid(linspace(0,1,nZeta), linspace(0,1,nEta));
 dZ = 1/(nZeta-1);
 dE = 1/(nEta-1);
 
+% % Physical Grid -> boundary conditions
+% xRange = [0.5, 1];
+% xS = equalCurveDist(nozzCoeffs, xRange, wt.*(nZeta-1)+1);
+% dx = xS(end) - xS(end-1);
+% xS = [xS(1:end-1), linspace(xS(end), 4, (1-wt).*(nZeta-1)+1)];
+% xW = zeros(nEta, 1);
+% xN = xS;
+% xE = xS(end).*ones(nEta, 1);
+% % xN = linspace(xW(end),xE(end), nZeta);
+% 
+% 
+% % yS = zeros(size(xS));
+% yN = [polyval(nozzCoeffs, xN(xN<1)), ones(size(xN(xN>=1)))];
+% yS = -yN;
+% % yN = ones(size(xN));
+% yW = linspace(yS(1), yN(1), nEta);
+% yE = linspace(yS(end), yN(end), nEta);
+
 % Physical Grid -> boundary conditions
 xRange = [0.5, 1];
-xS = equalCurveDist(nozzCoeffs, xRange, wt.*(nZeta-1)+1);
-dx = xS(end) - xS(end-1);
-xS = [xS(1:end-1), linspace(xS(end), 4, (1-wt).*(nZeta-1)+1)];
+xS = equalCurveDist(nozzCoeffs, xRange, nZeta);
 xW = zeros(nEta, 1);
 xN = xS;
-xE = xS(end).*ones(nEta, 1);
-% xN = linspace(xW(end),xE(end), nZeta);
+xE = ones(nEta, 1);
 
-
-% yS = zeros(size(xS));
-yN = [polyval(nozzCoeffs, xN(xN<1)), ones(size(xN(xN>=1)))];
+yN = [0.5.*(1 + (2.*xN(xN <1)-1).^2), ones(size(xN(xN >=1)))];
 yS = -yN;
-% yN = ones(size(xN));
 yW = linspace(yS(1), yN(1), nEta);
 yE = linspace(yS(end), yN(end), nEta);
 
@@ -43,7 +55,7 @@ for i = 1:size(UU,2) % march west to east, intialize X and Y
    UU(:,i,1:2) = cat(3, linspace(xS(i), xN(i), nEta), linspace(yS(i), yN(i), nEta));
 end
 coeffMat = zeros(4,size(UU,2));
-for i = size(UU,2):size(UU,2)
+for i = 1:size(UU,2)
     if i == 1
         normU(i,:) = [-(-1.5*yN(i)+2*yN(i+1)-0.5*yN(i+2)),(-1.5*xN(i)+2*xN(i+1)-0.5*xN(i+2))]./sqrt((-1.5*yN(i)+2*yN(i+1)-0.5*yN(i+2))^2+(-1.5*xN(i)+2*xN(i+1)-0.5*xN(i+2))^2);
         normL(i,:) = [-(-1.5*yS(i)+2*yS(i+1)-0.5*yS(i+2)),(-1.5*xS(i)+2*xS(i+1)-0.5*xS(i+2))]./sqrt((-1.5*yS(i)+2*yS(i+1)-0.5*yS(i+2))^2+(-1.5*xS(i)+2*xS(i+1)-0.5*xS(i+2))^2);
