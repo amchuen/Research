@@ -2,7 +2,7 @@ clc;
 clear;
 close all;
 
-dirName = 'isentropicNozzle';
+dirName = 'implicitNozzle';
 
 if ~exist(dirName, 'dir')
     mkdir(dirName);
@@ -11,7 +11,7 @@ end
 addpath(dirName);
 addpath('fluxSchemes\');
 addpath('viscositySchemes\');
-addpath('../../Matrix Solvers/');
+addpath('../../../Matrix Solvers/');
 
 %% Generate Grid
 
@@ -82,8 +82,8 @@ for ii = 1:1%length(gam_list)
         UU(1,end,:) = g_x(end).*((gam.*p_i).^(1/gam));
         
         % Check Stability?
-        epsE = epsFunc(UU(:,2:end,2), dx);
-        epsW = epsFunc(UU(:,1:end-1,2), dx);
+        epsE = VRvisc(UU(:,2:end,2), dx);
+        epsW = VRvisc(UU(:,1:end-1,2), dx);
         CFL = 0.5*dt - 0.5.*(epsE + epsW).*(dt/dx).^2;
         if visc_t >= max(CFL(:))
             visc_t = max(CFL(:))./1.5;
@@ -107,7 +107,7 @@ for ii = 1:1%length(gam_list)
         FF =  fluxFuncIsentropic(UU(:,:,3)./g_x, gam).*g_x;
         PP = ((UU(1,:,3)./g_x).^gam)./gam;
 
-        res(end+1,:) = reshape(max(abs((epsFunc(UU(:,2:end,3), dx).*(UU(:,3:end,3)-UU(:,2:end-1,3))-epsFunc(UU(:,1:end-1,3), dx).*(UU(:,2:end-1,3)-UU(:,1:end-2,3)))./(dx^2)...
+        res(end+1,:) = reshape(max(abs((VRvisc(UU(:,2:end,3), dx).*(UU(:,3:end,3)-UU(:,2:end-1,3))-VRvisc(UU(:,1:end-1,3), dx).*(UU(:,2:end-1,3)-UU(:,1:end-2,3)))./(dx^2)...
             - ((FF(:,3:end) - FF(:,1:end-2))./(2.*dx) - [0;1].*PP(2:end-1).*dgdx(2:end-1))), [], 2), 1, 2);
     
         figure(1);

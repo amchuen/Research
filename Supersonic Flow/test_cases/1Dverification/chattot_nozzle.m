@@ -2,7 +2,7 @@ clc;
 clear;
 close all;
 
-dirName = 'testStability';
+dirName = 'chattot_nozzle';
 
 if ~exist(dirName, 'dir')
     mkdir(dirName);
@@ -15,17 +15,21 @@ addpath('../../Matrix Solvers/');
 
 %% Generate Grid
 
-xx = linspace(0.5,1,151);
+xx = linspace(0,1,151);
 dx = xx(2) - xx(1);
 
-visc_x = 0.0005;
+visc_x = 0.005;
 % beta = 5e-6;
 ratio_list = linspace(0.975, 1, 7);% [0.85, 0.9, 0.999, 1];
 tol = 1e-3;
 
 %% Nozzle Geometry
-g_x = 1 + (2.*xx-1).^2;
-dgdx = [4*(2*xx(1)-1), (g_x(3:end)-g_x(1:end-2))./(2*dx), 0];
+aa = 0.4;
+g_x = [ 9/4.*(2*xx(xx<0.5)-1).^4 - 1.5.*(2*xx(xx<0.5)-1).^2 + 5/4,...
+        (1-aa).*(9/4.*(2*xx(xx>=0.5)-1).^4 - 1.5.*(2*xx(xx>=0.5)-1).^2)+5/4];
+dgdx = [2.*9.*(2.*xx(1)-1).^3 - 3.*2.*(2.*xx(1)-1), (g_x(3:end)-g_x(1:end-2))./(2*dx), (1-aa).*(2.*9.*(2.*xx(end)-1).^3 - 3.*2.*(2.*xx(end)-1))];
+
+figure();plot(xx, g_x);
 
 %% Fluid Properties
 % gam_list = 1.4:.1:2;
@@ -43,8 +47,8 @@ for ii = 8:(7+length(ratio_list))
     % Initialize Field Values
     % Inlet Conditions -> s0 = 0 (isentropic relations)
     if xx(1) == 0
-        rho0 = 1.5;%(0.5.*(gam+1))^(1/(gam-1));
-        u0 = 1/3;
+        rho0 = (0.5.*(gam+1))^(1/(gam-1));
+        u0 = 0;
     elseif xx(1) == 0.5
         rho0 = 1;
         u0 = 1;
@@ -54,7 +58,7 @@ for ii = 8:(7+length(ratio_list))
     H0 = 3;
 
     % Exit Conditions
-    p_i = 1;
+    p_i = 0.9;
     % rho_e = 1.20135; %1.2013512490310365;
     u_e = 0.416198;% 0.4162064994502009;
     rho_e = 1/(g_x(end)*u_e);
@@ -81,12 +85,12 @@ for ii = 8:(7+length(ratio_list))
     title('Residual');
     movegui(gcf, 'west');
     
-    figure(2);
-    Rho_x = plot(UU_x(1,:)); hold on;
-    U_x = plot(UU_x(2,:)./UU_x(1,:));
-    legend('\rho', 'u', 'Location', 'BestOutside');
-    title('Oscillation');
-    movegui(gcf, 'east');
+%     figure(2);
+%     Rho_x = plot(UU_x(1,:)); hold on;
+%     U_x = plot(UU_x(2,:)./UU_x(1,:));
+%     legend('\rho', 'u', 'Location', 'BestOutside');
+%     title('Oscillation');
+%     movegui(gcf, 'east');
 %     Ux_fig = figure();
         
     while length(time) < 3 || norm(res(end,:)) > tol
@@ -99,7 +103,7 @@ for ii = 8:(7+length(ratio_list))
         UU(:,end,2:3) = 5/2.*UU(:,end-1,2:3) - 2.*UU(:,end-2,2:3) + 0.5.*UU(:,end-3,2:3); % - 1/3.*UU(:,end-2,2:3);
 
         % 2) Fix Rho
-        UU(1,end,2:3) = g_x(end).*((gam.*p_i).^(1/gam));
+        UU(1,end,2:3) = g_x(end).*((2.*gam.*p_i).^(1/gam));
         
         % Check CFL
         U_0 = abs(UU(2,2:end-1,end)./UU(1,2:end-1,end));
@@ -127,13 +131,13 @@ for ii = 8:(7+length(ratio_list))
 
         res(end+1,:) = reshape(max(abs((visc_x.*(UU(:,3:end,3)-UU(:,2:end-1,3))-visc_x.*(UU(:,2:end-1,3)-UU(:,1:end-2,3)))./(dx^2)...
             - ((FF(:,3:end) - FF(:,1:end-2))./(2.*dx) - [0;1].*PP(2:end-1).*dgdx(2:end-1))), [], 2), 1, 2);
-        UU_x(:,end+1) = UU(:,xx==0.65,3);
+%         UU_x(:,end+1) = UU(:,xx==0.65,3);
         
         % Plot Residuals
         resRho.YData(end+1) = res(end,1);
         resU.YData(end+1) = res(end,2);
-        Rho_x.YData(end+1) = UU_x(1,end);
-        U_x.YData(end+1) = UU_x(2,end)./UU_x(1,end);
+%         Rho_x.YData(end+1) = UU_x(1,end);
+%         U_x.YData(end+1) = UU_x(2,end)./UU_x(1,end);
         drawnow;
 
     end
