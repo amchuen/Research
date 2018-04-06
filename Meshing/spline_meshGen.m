@@ -119,6 +119,8 @@ figure(1);
 plot(UU(:,:,1), UU(:,:,2), 'b-', UU(:,:,1)', UU(:,:,2)', 'b-'); axis equal;
 
 figure();contourf(UU(:,:,1), UU(:,:,2), normMat, 50); axis equal;
+colorbar;
+saveas(gcf, 'spline_mesh_orthogCheck.pdf');
 
 % figure(1);
 % saveas(gcf, 'cubic_mesh_higherRes', 'pdf');
