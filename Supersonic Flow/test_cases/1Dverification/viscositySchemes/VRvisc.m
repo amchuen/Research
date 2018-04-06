@@ -1,4 +1,4 @@
-function epsilon = epsFunc(U, dx)
+function epsilon = VRvisc(U, dx)
 
 visc = 0.5;
 visc_ss = 0.2*dx;
