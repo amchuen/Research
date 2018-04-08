@@ -1,4 +1,4 @@
-function OUT = threeLevelExplicit(GR, FL, BC, U0, fluxFunc, varargin)
+function OUT = jstRK4(GR, FL, BC, U0, fluxFunc, varargin)
 
 %% Run Checks
 
@@ -17,7 +17,7 @@ function OUT = threeLevelExplicit(GR, FL, BC, U0, fluxFunc, varargin)
 
 % Matrix Dimensions
 % 1:Y, 2:X, 3:vec, 4:t
-UU = repmat(U0,1,1,1,3);%struct('fv',repmat(U0,1,1,1,3),'f2',zeros(size(U0)), 'f1', zeros(size(U0)));
+UU = repmat(U0,1,1,1,2);%struct('fv',repmat(U0,1,1,1,3),'f2',zeros(size(U0)), 'f1', zeros(size(U0)));
 
 % Calculate Residual before running simulation
 res = ones(2,size(UU,3)); %resCalc(GR, FL, BC, func, epsFunc, UU(:,:,:,end));
@@ -35,12 +35,10 @@ dtLast = GR.dt;
 while norm(res(end,:)./maxRes) > GR.tol || time(end) < GR.tEnd
     
     % Step-Forward
-    UU(:,:,:,1:2) = UU(:,:,:,2:3);
+    UU(:,:,:,1) = UU(:,:,:,2);
     
     % Calculate Flux Terms
-    [flux, waveSpd, ~, eps1, eps2] = fluxFunc(GR, FL, BC, UU(:,:,:,2));
-%     [flux, waveSpd] = fluxFunc(GR, FL, BC, UU(:,:,:,2));
-        
+    [PW0, waveSpd] = fluxFunc(GR, FL, BC, UU(:,:,:,1));
     % Check CFL
     cflWave = GR.dt.*(waveSpd(1)./GR.dx + waveSpd(2)./GR.dy);
     GR.cflFactor = 1;
@@ -55,18 +53,14 @@ while norm(res(end,:)./maxRes) > GR.tol || time(end) < GR.tEnd
             dtLast = GR.dt;
         end
     end
+    UU1 = UU(:,:,:,1) - GR.dt*0.5.*PW0;
+    PW1 = fluxFunc(GR, FL, BC, UU1);
+    UU2 = UU(:,:,:,1) - GR.dt*0.5.*PW1;
+    PW2 = fluxFunc(GR, FL, BC, UU2);
+    UU3 = UU(:,:,:,1) - GR.dt.*PW2;
+    UU(:,:,:,2) = UU(:,:,:,1) - GR.dt.*(PW0 + 2.*PW1 + 2.*PW2 + fluxFunc(GR,FL,BC,UU3))./6;
     
-    % Compute Diffusive Terms -> also outputs modifications to time-stepping
-%     [artDiff, timeCoeffs] = diffusionFunc(UU(:,:,:,2), GR, BC, FL);
-    
-    % Compute Time-Step
-    beta = (GR.dt^2).*(eps1./(GR.dx^2) + eps2./(GR.dy^2))./GR.ratio;
-    if GR.isPolar
-        UU(:,:,:,3) = ((1-alpha2-alpha1).*UU(:,:,:,1)+alpha2.*(UU.f2)+alpha1.*(UU.f1)./(0.5.*(GR.RR_N+GR.RR_S))-(1+1/cflFactor).*GR.dt.*(flux - epsFunc(GR,BC,'X').*rotLaplace))./(1+alpha2+alpha1);
-    else
-%         UU(:,:,:,3) = (timeCoeffs{3}.*UU(:,:,:,1)+(1+1/GR.cflFactor).*GR.dt.*(artDiff - flux))./timeCoeffs{1};
-        UU(:,:,:,3) = (2.*beta.*UU(:,:,:,2)./(GR.dt^2)-(beta./(GR.dt^2)-0.5./GR.dt).*UU(:,:,:,1) - flux)./(beta./(GR.dt^2)+0.5./GR.dt);
-    end
+%     [flux, waveSpd] = fluxFunc(GR, FL, BC, UU(:,:,:,2));
     
     % Calculate Residual
     res(end+1,:) = resCalc(GR, UU(:,:,:,end-1:end));    

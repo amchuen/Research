@@ -83,7 +83,8 @@ BC.E.varType = BC.N.varType;
 U0 = cat(3,repmat(ones(size(GR.XX)),1,1,2), zeros(size(GR.XX)));%cat(3, ones(size(GR.XX)), GR.XX);
 
 % OUT = dufortFrankel(GR, FL, BC, @eulerIsenFunc, @vonNeumRichtVisc, U0);
-OUT = threeLevelExplicit(GR, FL, BC, U0, @eulerIsenFunc, @VRdiffusion);
+fluxFunc = @(GR, FL, BC, EE) fluxCD_2Diff(@isentropicEuler, @vonNeumRichtVisc, GR, FL, BC, EE);
+OUT = threeLevelExplicit(GR, FL, BC, U0, fluxFunc);
 
 %% Post Process
 close all;

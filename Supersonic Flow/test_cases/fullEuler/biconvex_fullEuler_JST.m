@@ -20,7 +20,7 @@ clear;
 
 %% GR - grid information, such as the meshfield, grid spacing (dx, dy, etc.)
 % Define Grid
-dy = 0.08;
+dy = 0.05;
 dx = 0.05;
 
 % Field Axis Values
@@ -43,7 +43,7 @@ FL.M0 = 1.1;
 GR.tol = 1e-5;
 GR.tEnd = 0.2; % 10 seconds maximum?
 GR.dt = dx^2;
-GR.CFL = 1;
+GR.CFL = 2.*sqrt(2);
 
 %% Diffusion Coefficients
 
@@ -100,7 +100,9 @@ BC.E.varType = BC.N.varType;
 U0 = cat(3,repmat(ones(size(GR.XX)),1,1,2), zeros(size(GR.XX)), ones(size(GR.XX))./(FL.gam*(FL.gam-1)*FL.M0^2)+0.5);%cat(3, ones(size(GR.XX)), GR.XX);
 
 % OUT = dufortFrankel(GR, FL, BC, @eulerFullFunc, epsFunc, U0);
-fluxFunc = @(GR, FL, BC, EE) fluxCD_2Diff(@fullEuler, @vonNeumRichtVisc, GR, FL, BC, EE);
+GR.ratio = 0.5;
+fluxFunc = @(GR, FL, BC, EE) fluxCD_jst(@fullEuler, GR, FL, BC, EE);
+% OUT = jstRK4(GR, FL, BC, U0, fluxFunc);
 OUT = threeLevelExplicit(GR, FL, BC, U0, fluxFunc);
 
 %% Post Process

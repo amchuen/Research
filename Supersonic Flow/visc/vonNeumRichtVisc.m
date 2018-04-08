@@ -1,8 +1,9 @@
 function varargout = vonNeumRichtVisc(FF, GR, BC, FL, varargin)
 
 alpha = 0.5;
+alphaMin = 0.75;
 power = 1;
-epsMin = GR.dx*GR.dy;
+% epsMin = min(GR.dx^2,GR.dy^2);
 DIRnames = {'N', 'S', 'E', 'W'};
 
 if ~isempty(varargin)
@@ -41,7 +42,22 @@ function visc = calcVisc(DIR)
     end
     testInd = isinf(visc) + isnan(visc);
     visc(logical(testInd)) = 0;
-    visc = visc + epsMin;
+    switch DIR
+        case {'W', 'E'}
+            if GR.dx > GR.dy
+                visc_min = GR.dx*GR.dy;
+            else
+                visc_min = GR.dx^2;
+            end
+            
+        case {'N', 'S'}
+            if GR.dy > GR.dx
+                visc_min = GR.dx*GR.dy;
+            else
+                visc_min = GR.dx^2;
+            end
+    end
+    visc = visc + alphaMin*visc_min;
 end
 
 end
