@@ -104,24 +104,25 @@ function BC_vals = gen_outletBC(GR, FL, BC, FF, DIR)
             indPhi = reshape(strcmp(BC.(DIR).varType, 'phi'),1,1,size(FF,3)); % checks for potential
 %             BC_vals = FF(:,end-1,:).*indTan + (2.*FF(:,end,:) - FF(:,end-1,:)).*indPhi;
             BC_vals = (4/3.*FF(:,end,:) - 1/3.*FF(:,end-1,:)).*indTan + (2.*FF(:,end,:) - FF(:,end-1,:)).*indPhi;
-%             
-%             if strcmp(BC.(DIR).exitCond{1}, 'p') % check if exit pressure is defined
-%                 if any(strcmp(BC.(DIR).varName, '\rho e')) % full Euler case
-%                     indE = reshape(strcmp(BC.(DIR).varName, '\rho e'),1,1,size(FF,3));
-%                     indV1 = reshape(strcmp(BC.(DIR).varType, 'v1'),1,1,size(FF,3));
-%                     indV2 = reshape(strcmp(BC.(DIR).varType, 'v2'),1,1,size(FF,3));
-%                     indRho = reshape(strcmp(BC.(DIR).varName, '\rho'),1,1,size(FF,3));
-%                     BC_vals(:,:,indE) = BC.(DIR).exitCond{2}./(FL.gam-1) + 0.5.*(BC_vals(:,:,indV1).^2 + BC_vals(:,:,indV2).^2)./BC_vals(:,:,indRho);
-%                     
-%                 elseif any(strcmp(BC.(DIR).varName, '\rho u')) % isentropic euler case
-%                     indRho = reshape(strcmp(BC.(DIR).varName, '\rho'),1,1,size(FF,3));
-%                     BC_vals(:,:,indRho) = ((FL.gam.*FL.M0.*BC.(DIR).exitCond{2}).^(1/FL.gam));
-%                 end
-%                 
-% %             else -> maybe define this for exit density or exit velocity?
-%                 
-%                 
-%             end
+            
+            %if exist
+            if strcmp(BC.(DIR).exitCond{1}, 'p') % check if exit pressure is defined
+                if any(strcmp(BC.(DIR).varName, '\rho e')) % full Euler case
+                    indE = reshape(strcmp(BC.(DIR).varName, '\rho e'),1,1,size(FF,3));
+                    indV1 = reshape(strcmp(BC.(DIR).varType, 'v1'),1,1,size(FF,3));
+                    indV2 = reshape(strcmp(BC.(DIR).varType, 'v2'),1,1,size(FF,3));
+                    indRho = reshape(strcmp(BC.(DIR).varName, '\rho'),1,1,size(FF,3));
+                    BC_vals(:,:,indE) = BC.(DIR).exitCond{2}./(FL.gam-1) + 0.5.*(BC_vals(:,:,indV1).^2 + BC_vals(:,:,indV2).^2)./BC_vals(:,:,indRho);
+                    
+                elseif any(strcmp(BC.(DIR).varName, '\rho u')) % isentropic euler case
+                    indRho = reshape(strcmp(BC.(DIR).varName, '\rho'),1,1,size(FF,3));
+                    BC_vals(:,:,indRho) = ((FL.gam.*FL.M0.*BC.(DIR).exitCond{2}).^(1/FL.gam));
+                end
+                
+%             else -> maybe define this for exit density or exit velocity?
+                
+                
+            end
 
         case 'N' 
             BC_vals = FF(end,:,:);
@@ -247,7 +248,8 @@ function BC_vals = gen_wallBC(GR, BC, FF, DIR)
             else
                 BC_vals = (  FF(1,:,:).*(indTan+indScalar+indPhi-indNorm)...
                             - GR.dy.*reshape(BC.(DIR).dydx,1,size(FF,2)).*indPhi...
-                            + 2.*FF(1,:,indRho).*reshape(BC.(DIR).dydx,1,size(FF,2)).*indNorm);... - FF(1,:,:);
+                            + 2.*FF(1,:,indTan).*reshape(BC.(DIR).dydx,1,size(FF,2)).*indNorm);... - FF(1,:,:);
+%                             + 2.*FF(1,:,indRho).*reshape(BC.(DIR).dydx,1,size(FF,2)).*indNorm);... - FF(1,:,:);
             end
     end
 end
