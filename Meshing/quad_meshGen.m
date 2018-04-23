@@ -98,15 +98,6 @@ for i = [1,2:2:length(xN)-1,length(xN)] %2:2:(size(xN,2)-1)
     
 end
 
-figure(1);hold on;
-plot(UU_1(:,:,1), UU_1(:,:,2), 'b-', UU_1(:,:,1)', UU_1(:,:,2)', 'b-'); axis equal; 
-hold on;
-plot(UU_2(:,:,1), UU_2(:,:,2), 'r-', UU_2(:,:,1)', UU_2(:,:,2)', 'r-');
-quiver(xN(1:2:end)',yN(1:2:end)',normU(1:2:end,1), normU(1:2:end,2)); hold on;
-quiver(xS(1:2:end)',yS(1:2:end)',normL(1:2:end,1), normL(1:2:end,2));
-plot(xN, yN, 'o');
-plot(xS, yS, 'o');
-
 %% Fit a quadratic Across X
 
 % Refit Primary Grid
@@ -163,29 +154,73 @@ plot(UU_1(:,:,1), UU_1(:,:,2), 'b-', UU_1(:,:,1)', UU_1(:,:,2)', 'b-'); axis equ
 plot(UU_2(:,:,1), UU_2(:,:,2), 'r--', UU_2(:,:,1)', UU_2(:,:,2)', 'r--'); axis equal;
 saveas(gcf, 'quadratic_spline_mesh', 'pdf');
 
-% figure();contourf(UU_1(:,:,1), UU_1(:,:,2), normMat_1, 50); axis equal;
-% colorbar;
-% saveas(gcf, 'quadratic_spline_mesh_orthogCheck', 'pdf');
+%% Find Cell Volumes
+UU_2SW = UU_2(1:end-1,1:end-1,:);
+UU_2SE = UU_2(1:end-1,2:end,:);
+UU_2NE = UU_2(2:end,2:end,:);
+UU_2NW = UU_2(2:end,1:end-1,:);
+
+% Calculate initial volumes first
+UU_vol = 0.5.*abs(  UU_2SW(:,:,1).*UU_2SE(:,:,2) + ... (1,1)*(2,1)
+                    UU_2SE(:,:,1).*UU_2NE(:,:,2) + ... (2,1)*(2,2)
+                    UU_2NE(:,:,1).*UU_2NW(:,:,2) + ... (2,2)*(1,2)
+                    UU_2NW(:,:,1).*UU_2SW(:,:,2) + ... (1,2)*(1,1)
+                    -(UU_2SW(:,:,2).*UU_2SE(:,:,1) + ... (1,1)*(2,1)
+                    UU_2SE(:,:,2).*UU_2NE(:,:,1) + ... (2,1)*(2,2)
+                    UU_2NE(:,:,2).*UU_2NW(:,:,1) + ... (2,2)*(1,2)
+                    UU_2NW(:,:,2).*UU_2SW(:,:,1)) ... (1,2)*(1,1)
+                    );
+                
+% Correct Boundaries
+UU_vol(2:end-1,end) = UU_vol(2:end-1,end)   - UU_2(2:end-2,end,1).*UU_2(3:end-1,end,2) + UU_2(2:end-2,end,2).*UU_2(3:end-1,end,1)... remove contribution of red edge at exit, need to add interpolations between red and blue edges!
+                                            + UU_2(2:end-2,end,1).*UU_1(2:end-1,end,2) + UU_1(2:end-1,end,1).*UU_2(3:end-1,end,2)... add contributions of x in primary grid
+                                            - UU_2(2:end-2,end,2).*UU_1(2:end-1,end,1) - UU_1(2:end-1,end,2).*UU_2(3:end-1,end,1); % subtract contributions of y in primary grid 
+    
+%% Calculate Grid Normals
+
+normN = cat(3, -diff(UU_2(2:end,:,2),1,2), diff(UU_2(2:end,:,1),1,2));
+normS = cat(3, -diff(UU_2(1:end-1,:,2),1,2), diff(UU_2(1:end-1,:,1),1,2));
+normW = cat(3, -diff(UU_2(:,1:end-1,2),1,1), diff(UU_2(:,1:end-1,1),1,1));
+normE = cat(3, -diff(UU_2(:,2:end,2),1,1), diff(UU_2(:,2:end,1),1,1));
+
+%% Calculate Weights
+
+UU_N = [UU_1(2:end,:,:);UU_1(end,:,:)];
+UU_S = [UU_1(1,:,:);UU_1(1:end-1,:,:)];
+UU_W = [UU_1(:,1,:),UU_1(:,1:end-1,:)];
+UU_E = [UU_1(:,2:end,:),UU_1(:,end,:)];
+
+midpt_N = cat(3,    ((UU_1(:,:,1).*UU_N(:,:,2) - UU_1(:,:,2).*UU_N(:,:,1)).*(UU_2NW(:,:,1)-UU_2NE(:,:,1))-(UU_1(:,:,1) - UU_N(:,:,1)).*(UU_2NW(:,:,1).*UU_2NE(:,:,2)-UU_2NW(:,:,2).*UU_2NE(:,:,1)))./...
+                    ((UU_1(:,:,1)-UU_N(:,:,1)).*(UU_2NW(:,:,2) - UU_2NE(:,:,2)) - (UU_1(:,:,2)-UU_N(:,:,2)).*(UU_2NW(:,:,1)-UU_2NE(:,:,1))),...
+                    ((UU_1(:,:,1).*UU_N(:,:,2) - UU_1(:,:,2).*UU_N(:,:,1)).*(UU_2NW(:,:,2)-UU_2NE(:,:,2))-(UU_1(:,:,2) - UU_N(:,:,2)).*(UU_2NW(:,:,1).*UU_2NE(:,:,2)-UU_2NW(:,:,2).*UU_2NE(:,:,1)))./...
+                    ((UU_1(:,:,1)-UU_N(:,:,1)).*(UU_2NW(:,:,2) - UU_2NE(:,:,2)) - (UU_1(:,:,2)-UU_N(:,:,2)).*(UU_2NW(:,:,1)-UU_2NE(:,:,1)))...
+                    );
+midpt_N(end,:,:) = UU_1(end,:,:);
+
+wt_N = cat(3, sqrt(sum((UU_1 - midpt_N).^2,3)), sqrt(sum((UU_N - midpt_N).^2,3)))./sqrt(sum((UU_1-UU_N).^2,3));
+
+midpt_S = cat(3,    ((UU_1(:,:,1).*UU_S(:,:,2) - UU_1(:,:,2).*UU_S(:,:,1)).*(UU_2SW(:,:,1)-UU_2SE(:,:,1))-(UU_1(:,:,1) - UU_S(:,:,1)).*(UU_2SW(:,:,1).*UU_2SE(:,:,2)-UU_2SW(:,:,2).*UU_2SE(:,:,1)))./...
+                    ((UU_1(:,:,1)-UU_S(:,:,1)).*(UU_2SW(:,:,2) - UU_2SE(:,:,2)) - (UU_1(:,:,2)-UU_S(:,:,2)).*(UU_2SW(:,:,1)-UU_2SE(:,:,1))),...
+                    ((UU_1(:,:,1).*UU_S(:,:,2) - UU_1(:,:,2).*UU_S(:,:,1)).*(UU_2SW(:,:,2)-UU_2SE(:,:,2))-(UU_1(:,:,2) - UU_S(:,:,2)).*(UU_2SW(:,:,1).*UU_2SE(:,:,2)-UU_2SW(:,:,2).*UU_2SE(:,:,1)))./...
+                    ((UU_1(:,:,1)-UU_S(:,:,1)).*(UU_2SW(:,:,2) - UU_2SE(:,:,2)) - (UU_1(:,:,2)-UU_S(:,:,2)).*(UU_2SW(:,:,1)-UU_2SE(:,:,1)))...
+                    );
+midpt_S(1,:,:) = UU_1(1,:,:);
+wt_S = cat(3, sqrt(sum((UU_1 - midpt_S).^2,3)), sqrt(sum((UU_S - midpt_S).^2,3)))./sqrt(sum((UU_1-UU_S).^2,3));
 
 
-% figure(1);
-% saveas(gcf, 'cubic_mesh_higherRes', 'pdf');
+midpt_E = cat(3,    ((UU_1(:,:,1).*UU_E(:,:,2) - UU_1(:,:,2).*UU_E(:,:,1)).*(UU_2SE(:,:,1)-UU_2NE(:,:,1))-(UU_1(:,:,1) - UU_E(:,:,1)).*(UU_2SE(:,:,1).*UU_2NE(:,:,2)-UU_2SE(:,:,2).*UU_2NE(:,:,1)))./...
+                    ((UU_1(:,:,1)-UU_E(:,:,1)).*(UU_2SE(:,:,2) - UU_2NE(:,:,2)) - (UU_1(:,:,2)-UU_E(:,:,2)).*(UU_2SE(:,:,1)-UU_2NE(:,:,1))),...
+                    ((UU_1(:,:,1).*UU_E(:,:,2) - UU_1(:,:,2).*UU_E(:,:,1)).*(UU_2SE(:,:,2)-UU_2NE(:,:,2))-(UU_1(:,:,2) - UU_E(:,:,2)).*(UU_2SE(:,:,1).*UU_2NE(:,:,2)-UU_2SE(:,:,2).*UU_2NE(:,:,1)))./...
+                    ((UU_1(:,:,1)-UU_E(:,:,1)).*(UU_2SE(:,:,2) - UU_2NE(:,:,2)) - (UU_1(:,:,2)-UU_E(:,:,2)).*(UU_2SE(:,:,1)-UU_2NE(:,:,1)))...
+                    );
+midpt_E(:,end,:) = UU_1(:,end,:);
+wt_E = cat(3, sqrt(sum((UU_1 - midpt_E).^2,3)), sqrt(sum((UU_E - midpt_E).^2,3)))./sqrt(sum((UU_1-UU_E).^2,3));
 
-% %% Find Cell Volumes
-% deltaX_NS = UU_1(:,2:end,1:2) - UU_1(:,1:end-1,1:2);
-% xTest = cat(3,1,-1).*deltaX_NS(:,:,2:-1:1);%[deltaY, -deltaX];%./sqrt(deltaY.^2 + deltaX.^2);
-% midX_NS = 0.5.*(UU_1(:,2:end,:) + UU_1(:,1:end-1,:));
-% xx1 = -xTest(1,1,:) + midX_NS(1,1,:);
-% xx2 = xTest(2,1,:) + midX_NS(2,1,:);
-% figure(10); hold on;
-% plot([midX_NS(1,1,1), xx1(1)], [midX_NS(1,1,2), xx1(2)], 'ro-');
-% plot([midX_NS(2,1,1), xx2(1)], [midX_NS(2,1,2), xx2(2)], 'ko-');
-% 
-% deltaX_EW = UU_1(2:end,:,:) - UU_1(1:end-1,:,:);
-% xTest_EW = cat(3,1,-1).*deltaX_EW(:,:,2:-1:1);
-% midX_EW = 0.5.*(UU_1(2:end,:,:) + UU_1(1:end-1,:,:));
-% xx3 = xTest_EW(1,1,:) + midX_EW(1,1,:);
-% xx4 = -xTest_EW(1,2,:) + midX_EW(1,2,:);
-% 
-% plot([midX_EW(1,1,1), xx3(1)], [midX_EW(1,1,2), xx3(2)], 'bo-');
-% plot([midX_EW(1,2,1), xx4(1)], [midX_EW(1,2,2), xx4(2)], 'o-');
+
+midpt_W = cat(3,    ((UU_1(:,:,1).*UU_W(:,:,2) - UU_1(:,:,2).*UU_W(:,:,1)).*(UU_2NW(:,:,1)-UU_2SW(:,:,1))-(UU_1(:,:,1) - UU_W(:,:,1)).*(UU_2NW(:,:,1).*UU_2SW(:,:,2)-UU_2NW(:,:,2).*UU_2SW(:,:,1)))./...
+                    ((UU_1(:,:,1)-UU_W(:,:,1)).*(UU_2NW(:,:,2) - UU_2SW(:,:,2)) - (UU_1(:,:,2)-UU_W(:,:,2)).*(UU_2NW(:,:,1)-UU_2SW(:,:,1))),...
+                    ((UU_1(:,:,1).*UU_W(:,:,2) - UU_1(:,:,2).*UU_W(:,:,1)).*(UU_2NW(:,:,2)-UU_2SW(:,:,2))-(UU_1(:,:,2) - UU_W(:,:,2)).*(UU_2NW(:,:,1).*UU_2SW(:,:,2)-UU_2NW(:,:,2).*UU_2SW(:,:,1)))./...
+                    ((UU_1(:,:,1)-UU_W(:,:,1)).*(UU_2NW(:,:,2) - UU_2SW(:,:,2)) - (UU_1(:,:,2)-UU_W(:,:,2)).*(UU_2NW(:,:,1)-UU_2SW(:,:,1)))...
+                    );
+midpt_W(:,1,:) = UU_1(:,1,:);
+wt_W = cat(3, sqrt(sum((UU_1 - midpt_W).^2,3)), sqrt(sum((UU_W - midpt_W).^2,3)))./sqrt(sum((UU_1-UU_W).^2,3));
