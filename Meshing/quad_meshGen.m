@@ -197,7 +197,8 @@ midpt_N = cat(3,    ((UU_1(:,:,1).*UU_N(:,:,2) - UU_1(:,:,2).*UU_N(:,:,1)).*(UU_
                     );
 midpt_N(end,:,:) = UU_1(end,:,:);
 
-wt_N = cat(3, sqrt(sum((UU_1 - midpt_N).^2,3)), sqrt(sum((UU_N - midpt_N).^2,3)))./sqrt(sum((UU_1-UU_N).^2,3));
+wt_N = cat(3, sqrt(sum((UU_1 - midpt_N).^2,3)), sqrt(sum((UU_N - midpt_N).^2,3)));
+wt_N(1:end-1,:,:) = wt_N(1:end-1,:,:)./sqrt(sum((UU_1(1:end-1,:,:)-UU_N(1:end-1,:,:)).^2,3));
 
 midpt_S = cat(3,    ((UU_1(:,:,1).*UU_S(:,:,2) - UU_1(:,:,2).*UU_S(:,:,1)).*(UU_2SW(:,:,1)-UU_2SE(:,:,1))-(UU_1(:,:,1) - UU_S(:,:,1)).*(UU_2SW(:,:,1).*UU_2SE(:,:,2)-UU_2SW(:,:,2).*UU_2SE(:,:,1)))./...
                     ((UU_1(:,:,1)-UU_S(:,:,1)).*(UU_2SW(:,:,2) - UU_2SE(:,:,2)) - (UU_1(:,:,2)-UU_S(:,:,2)).*(UU_2SW(:,:,1)-UU_2SE(:,:,1))),...
@@ -205,7 +206,8 @@ midpt_S = cat(3,    ((UU_1(:,:,1).*UU_S(:,:,2) - UU_1(:,:,2).*UU_S(:,:,1)).*(UU_
                     ((UU_1(:,:,1)-UU_S(:,:,1)).*(UU_2SW(:,:,2) - UU_2SE(:,:,2)) - (UU_1(:,:,2)-UU_S(:,:,2)).*(UU_2SW(:,:,1)-UU_2SE(:,:,1)))...
                     );
 midpt_S(1,:,:) = UU_1(1,:,:);
-wt_S = cat(3, sqrt(sum((UU_1 - midpt_S).^2,3)), sqrt(sum((UU_S - midpt_S).^2,3)))./sqrt(sum((UU_1-UU_S).^2,3));
+wt_S = cat(3, sqrt(sum((UU_1 - midpt_S).^2,3)), sqrt(sum((UU_S - midpt_S).^2,3)));
+wt_S(2:end,:,:) = wt_S(2:end,:,:)./sqrt(sum((UU_1(2:end,:,:)-UU_S(2:end,:,:)).^2,3));
 
 
 midpt_E = cat(3,    ((UU_1(:,:,1).*UU_E(:,:,2) - UU_1(:,:,2).*UU_E(:,:,1)).*(UU_2SE(:,:,1)-UU_2NE(:,:,1))-(UU_1(:,:,1) - UU_E(:,:,1)).*(UU_2SE(:,:,1).*UU_2NE(:,:,2)-UU_2SE(:,:,2).*UU_2NE(:,:,1)))./...
@@ -214,7 +216,8 @@ midpt_E = cat(3,    ((UU_1(:,:,1).*UU_E(:,:,2) - UU_1(:,:,2).*UU_E(:,:,1)).*(UU_
                     ((UU_1(:,:,1)-UU_E(:,:,1)).*(UU_2SE(:,:,2) - UU_2NE(:,:,2)) - (UU_1(:,:,2)-UU_E(:,:,2)).*(UU_2SE(:,:,1)-UU_2NE(:,:,1)))...
                     );
 midpt_E(:,end,:) = UU_1(:,end,:);
-wt_E = cat(3, sqrt(sum((UU_1 - midpt_E).^2,3)), sqrt(sum((UU_E - midpt_E).^2,3)))./sqrt(sum((UU_1-UU_E).^2,3));
+wt_E = cat(3, sqrt(sum((UU_1 - midpt_E).^2,3)), sqrt(sum((UU_E - midpt_E).^2,3)));
+wt_E(:,1:end-1,:) = wt_E(:,1:end-1,:)./sqrt(sum((UU_1(:,1:end-1,:)-UU_E(:,1:end-1,:)).^2,3));
 
 
 midpt_W = cat(3,    ((UU_1(:,:,1).*UU_W(:,:,2) - UU_1(:,:,2).*UU_W(:,:,1)).*(UU_2NW(:,:,1)-UU_2SW(:,:,1))-(UU_1(:,:,1) - UU_W(:,:,1)).*(UU_2NW(:,:,1).*UU_2SW(:,:,2)-UU_2NW(:,:,2).*UU_2SW(:,:,1)))./...
@@ -223,4 +226,12 @@ midpt_W = cat(3,    ((UU_1(:,:,1).*UU_W(:,:,2) - UU_1(:,:,2).*UU_W(:,:,1)).*(UU_
                     ((UU_1(:,:,1)-UU_W(:,:,1)).*(UU_2NW(:,:,2) - UU_2SW(:,:,2)) - (UU_1(:,:,2)-UU_W(:,:,2)).*(UU_2NW(:,:,1)-UU_2SW(:,:,1)))...
                     );
 midpt_W(:,1,:) = UU_1(:,1,:);
-wt_W = cat(3, sqrt(sum((UU_1 - midpt_W).^2,3)), sqrt(sum((UU_W - midpt_W).^2,3)))./sqrt(sum((UU_1-UU_W).^2,3));
+wt_W = cat(3, sqrt(sum((UU_1 - midpt_W).^2,3)), sqrt(sum((UU_W - midpt_W).^2,3)));
+wt_W(:,2:end,:) = wt_W(:,2:end,:)./sqrt(sum((UU_1(:,2:end,:)-UU_W(:,2:end,:)).^2,3));
+
+%% Save info to .mat file
+
+save('quad_nozzle.mat', 'UU_1', 'UU_2', 'normN', 'normS', 'normE', 'normW',...
+                        'midpt_N', 'midpt_S', 'midpt_E', 'midpt_W',...
+                        'wt_N', 'wt_S', 'wt_E', 'wt_W',...
+                        'UU_vol');
