@@ -194,8 +194,13 @@ function plotCPeuler(FF,xstart, xend)
         saveas(gcf, [dirName 'cp_surf']);
     end
     
-    PP = FF(:,:,1).^(FL.gam)./(FL.gam .* FL.M0.^2);
-    figure();contourf(GR.XX, GR.YY, PP, 50);
+    if size(FF,3) == 3
+        PP = FF(:,:,1).^(FL.gam)./(FL.gam .* FL.M0.^2);
+    elseif size(FF,3) == 4
+        PP = (FL.gam-1).*(FF(:,:,4)-0.5.*(FF(:,:,2).^2+FF(:,:,3).^2)./FF(:,:,1));
+    end
+    figure();contourf(GR.XX, GR.YY, PP, 50); axis equal;
+    colorbar;
     title('Pressure');
     saveas(gcf, [dirName 'pressure'], 'pdf');
     saveas(gcf, [dirName 'pressure']);

@@ -16,7 +16,7 @@ addpath('viscositySchemes\');
 %% Generate Grid
 noz = load('mcCabe_nozzle.mat');
 xx = linspace(0,1,201);%linspace(0.5*(1-sqrt(3)/3),1,201);
-dx = xx(2) - xx(1);
+% dx = xx(2) - xx(1);
 
 visc_x = 0.005;
 % beta = 5e-6;
@@ -29,6 +29,7 @@ options = optimset('TolX', 1e-10);
 func = @(xval) ppval(noz.curve, xval);
 xThroat = fminbnd(func, 0, 1, options);
 xx = linspace(xThroat, 1, 201);
+dx = xx(2) - xx(1);
 
 g_x = 2.*ppval(noz.curve, xx);
 dgdx = [(-1.5.*g_x(1) + 2.*g_x(2) - 0.5*g_x(3))./dx, (g_x(3:end) - g_x(1:end-2))./(2*dx), (0.5*g_x(end-2)-2.*g_x(end-1)+1.5*g_x(end))./dx];
@@ -114,6 +115,7 @@ while length(time) < 3 || norm(res(end,:)) > tol
     % Update Outflow Boundary Condition
     % 1) Extrapolate rho and E
     UU(:,end,2:3) = 5/2.*UU(:,end-1,2:3) - 2.*UU(:,end-2,2:3) + 0.5.*UU(:,end-3,2:3); % - 1/3.*UU(:,end-2,2:3);
+%     UU(:,end,2:3) = (2.*UU(:,end-1,2:3) - UU(:,end-2,2:3));%.*g_x(end);
 
     % 2) Fix E
     UU(3,end,2:3) = (p_i.*g_x(end)/(gam-1) + 0.5.*(UU(2,end,2:3).^2)./UU(1,end,2:3));
