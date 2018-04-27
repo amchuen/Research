@@ -35,17 +35,18 @@ ylabel('y [inches]')
 
 %% Generate Spline
 
-Area = y.^2.*pi;
-curve = spline(x./max(x), y./max(x));
+Area = 2.*y;
+curve = spline(x./min(Area), Area./min(Area));
 
-xx = linspace(0,1);
+xEnd = x(end)./min(Area);
+xx = linspace(0,xEnd);
 yy = ppval(curve,xx);
 
-hold on; plot(xx.*max(x), yy.*max(x));
+hold on; plot(xx.*min(Area), 0.5.*yy.*min(Area));
 
 func = @(xval) ppval(curve, xval);
 
 options = optimset('TolX', 1e-10);
-xThroat = fminbnd(func, 0, 1, options);
+xThroat = fminbnd(func, 0, xEnd, options);
 
-save('mcCabe_nozzle.mat', 'curve');
+save('mcCabe_nozzle.mat', 'curve', 'xThroat', 'xEnd');

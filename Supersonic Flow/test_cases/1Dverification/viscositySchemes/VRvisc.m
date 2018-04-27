@@ -1,7 +1,7 @@
 function epsilon = VRvisc(U, dx)
 
-visc = 1;
-visc_ss = 0.3*dx;
+visc = 0;
+visc_ss = 0.5*dx;
 % visc_ss = 0.001;
 
 epsilon = visc.*dx.*abs(diff(U,1,2)).^2;

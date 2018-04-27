@@ -325,19 +325,21 @@ function BC_vals = gen_smallDisturbBC(GR,BC, FF, DIR, ind)
             indPhi = reshape(strcmp(BC.(DIR)(ind).varType, 'phi'),1,1,size(FF,3)); % checks for potential
 %             BC_vals = FF(:,2,:).*indTan + (2.*FF(:,1,:) - FF(:,2,:)).*indPhi;
             BC_vals = (4/3.*FF(1,:,:) - 1/3.*FF(2,:,:)).*indTan + (2.*FF(1,:,:) - FF(2,:,:)).*indPhi;
+%             BC_vals = (2.*FF(1,:,:) - FF(2,:,:)).*indTan + (2.*FF(1,:,:) - FF(2,:,:)).*indPhi;
             
     end
 
     if isfield(BC.(DIR)(ind), 'perturb')
         BC_vals = BC_vals + BC.(DIR)(ind).perturb;
     elseif isfield(BC.(DIR)(ind), 'perturbPrim')
+        indices = all(all(BC.(DIR)(ind).perturbPrim ~= 0));
         switch DIR
             case 'E'
                 BC_vals = BC_vals + FF(:,end,indRho).*BC.(DIR)(ind).perturbPrim;
             case 'W'
                 BC_vals = BC_vals + FF(:,1,indRho).*BC.(DIR)(ind).perturbPrim;
             case 'S'
-                BC_vals = BC_vals + FF(1,:,indRho).*BC.(DIR)(ind).perturbPrim;
+                BC_vals(:,:,indices) = BC_vals(:,BC.(DIR)(ind).range(1)-1,indices) + FF(1,:,indRho).*BC.(DIR)(ind).perturbPrim(:,:,indices);
             case 'N'
                 BC_vals = BC_vals + FF(end,:,indRho).*BC.(DIR)(ind).perturbPrim;
         end

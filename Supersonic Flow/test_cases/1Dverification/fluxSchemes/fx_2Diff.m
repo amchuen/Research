@@ -9,9 +9,9 @@ FF = FF.*g_x;
 CC = sqrt(gam.*PP.*g_x./UU(1,:));
 
 % Calculate central difference
-dgdx = (g_x(3:end) - g_x(1:end-2))./(2*dx);
+dgdx = [(-1.5.*g_x(1) + 2.*g_x(2) - 0.5*g_x(3))./dx, (g_x(3:end) - g_x(1:end-2))./(2*dx), (0.5*g_x(end-2)-2.*g_x(end-1)+1.5*g_x(end))./dx];
 F_U = (FF(:,3:end) - FF(:,1:end-2))./(2.*dx);
-F_U(2,:) = F_U(2,:) - PP(2:end-1).*dgdx;
+F_U(2,:) = F_U(2,:) - PP(2:end-1).*dgdx(2:end-1);
     
 % Check CFL
 U_0 = abs(UU(2,:)./UU(1,:));

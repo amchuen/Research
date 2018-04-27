@@ -12,7 +12,7 @@ x_vals = linspace(xThroat, 1, 201);
 dx = x_vals(2) - x_vals(1);
 
 % Extend x for exit region
-x_vals = [x_vals, (x_vals(end)+(dx:dx:0.25))];
+x_vals = [x_vals, (x_vals(end)+(dx:dx:0.3))];
 
 dy = 0.005;
 
@@ -91,7 +91,7 @@ BC.S.range = [1, find(x_vals==1,1,'last')];
 BC.S(2).physical = 'smallDisturb';
 BC.S(2).varType = BC.N.varType;
 BC.S(2).varName = BC.N.varName;
-BC.S(2).perturbPrim = cat(3, zeros(size(x_vals)), -0.1*ones(size(x_vals)), repmat(zeros(size(x_vals)),1,1,2));
+BC.S(2).perturbPrim = cat(3, zeros(size(x_vals)), -1.5.*ones(size(x_vals)), repmat(zeros(size(x_vals)),1,1,2));
 BC.S(2).range = [find(x_vals == 1,1,'last')+1, length(x_vals)];
 
 % Outlet

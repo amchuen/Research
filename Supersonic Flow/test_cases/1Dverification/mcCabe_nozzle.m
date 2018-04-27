@@ -15,23 +15,18 @@ addpath('viscositySchemes\');
 
 %% Generate Grid
 noz = load('mcCabe_nozzle.mat');
-xx = linspace(0,1,201);%linspace(0.5*(1-sqrt(3)/3),1,201);
-% dx = xx(2) - xx(1);
+xx = linspace(noz.xThroat,noz.xEnd,201);%linspace(0.5*(1-sqrt(3)/3),1,201);
+% xx = linspace(0.5,1,201);
+dx = xx(2) - xx(1);
 
 visc_x = 0.005;
 % beta = 5e-6;
 ratio_list = 0.9875; %linspace(0.975, 1, 7);% [0.85, 0.9, 0.999, 1];
-tol = 1e-3;
+tol = 1e-6;
 
 %% Nozzle Geometry
-aa = 0.6;
-options = optimset('TolX', 1e-10);
-func = @(xval) ppval(noz.curve, xval);
-xThroat = fminbnd(func, 0, 1, options);
-xx = linspace(xThroat, 1, 201);
-dx = xx(2) - xx(1);
-
-g_x = 2.*ppval(noz.curve, xx);
+g_x = ppval(noz.curve, xx);
+% g_x = 1 + (2.*xx-1).^2;
 dgdx = [(-1.5.*g_x(1) + 2.*g_x(2) - 0.5*g_x(3))./dx, (g_x(3:end) - g_x(1:end-2))./(2*dx), (0.5*g_x(end-2)-2.*g_x(end-1)+1.5*g_x(end))./dx];
 
 figure();plot(xx, g_x);
@@ -45,7 +40,7 @@ cfl = 1;
 % Assign Gamma
 %     gam = gam_list(ii);
 ratio = 0.9875;
-dt = dx*0.5;
+dt = dx^2*0.5;
 
 % Initialize Field Values
 % Inlet Conditions -> s0 = 0 (isentropic relations)
@@ -58,11 +53,15 @@ else %if xx(1) == 0.5
 end
 p0 = (rho0^gam)/gam;
 E0 = p0/((gam-1)*rho0) + 0.5.*u0^2;
-H0 = 3;
+H0 = (gam/(gam-1))*p0/rho0 + 0.5;%3;
 
 % Exit Conditions
-M_e = 3;
-p_i = p0.*((1+0.5*(gam-1).*M_e^2)/(1+0.5*(gam-1))).^(-gam/(gam-1));
+M_e = 0.4;
+u_e = sqrt(H0/(0.5+(1/(gam-1))*(1/M_e^2)));
+% p_i = p0.*((1+0.5*(gam-1).*M_e^2)/(1+0.5*(gam-1))).^(-gam/(gam-1));
+p_e = (H0 - 0.5*u_e^2)*(gam-1)/(gam*u_e*g_x(end));
+rho_e = gam*p_e/((gam-1)*(H0-0.5*u_e^2));
+% p_i = 1;
 
 UU = [rho0; rho0*u0; rho0*E0].*g_x;
 UU = repmat(UU,1,1,3);
@@ -114,11 +113,17 @@ while length(time) < 3 || norm(res(end,:)) > tol
 
     % Update Outflow Boundary Condition
     % 1) Extrapolate rho and E
-    UU(:,end,2:3) = 5/2.*UU(:,end-1,2:3) - 2.*UU(:,end-2,2:3) + 0.5.*UU(:,end-3,2:3); % - 1/3.*UU(:,end-2,2:3);
+%     UU(:,end,2:3) = (5/2.*UU(:,end-1,2:3)./g_x(end-1) - 2.*UU(:,end-2,2:3)./g_x(end-2) + 0.5.*UU(:,end-3,2:3)./g_x(end-3)).*g_x(end); % - 1/3.*UU(:,end-2,2:3);
+    UU(:,end,2:3) = (5/2.*UU(:,end-1,2:3) - 2.*UU(:,end-2,2:3) + 0.5.*UU(:,end-3,2:3)); % - 1/3.*UU(:,end-2,2:3);
 %     UU(:,end,2:3) = (2.*UU(:,end-1,2:3) - UU(:,end-2,2:3));%.*g_x(end);
 
-    % 2) Fix E
-    UU(3,end,2:3) = (p_i.*g_x(end)/(gam-1) + 0.5.*(UU(2,end,2:3).^2)./UU(1,end,2:3));
+    % 2) Fix End Condition
+%     p_i = (UU(1,end,2:3).*H0./(g_x(end)*gam))./(0.5*M_e^2+1/(gam-1));
+%     UU(1,end,2:3) = rho_e*g_x(end);
+%     UU(2,end,2:3) = rho_e*u_e*g_x(end);
+%     UU(3,end,2:3) = (p_e/(gam-1) + 0.5.*rho_e.*u_e^2).*g_x(end);
+    UU(3,end,2:3) = (p_e*g_x(end)/(gam-1) + 0.5.*(UU(2,end,2:3).^2)./UU(1,end,2:3));
+%     UU(2,end,2:3) = UU(1,end,2:3).*u_e;
 
     % Update Flux and Pressure
     [flux, Umax, ~, visc_beta] = fx_2Diff(@fluxFunc, @VRvisc, UU(:,:,end), g_x, gam, dx);
@@ -138,15 +143,15 @@ while length(time) < 3 || norm(res(end,:)) > tol
 end
 
 %% Post Process
-ii=2;
+% ii=3;
 fileName = ['ratio_' num2str(ii)];
 save([dirName '\' fileName]);
 
 figure(1);
 saveas(gcf, [dirName '\resFig_' fileName]);
 
-figure(2);
-saveas(gcf, [dirName '\oscFig_' fileName]);
+% figure(2);
+% saveas(gcf, [dirName '\oscFig_' fileName]);
 
 figure();
 [~, PP] = fluxFunc(UU(:,:,end)./g_x, gam);
@@ -154,8 +159,9 @@ plot(xx, UU(1,:,3)./g_x, '*-'); hold on;
 plot(xx, UU(2,:,3)./UU(1,:,3), 'o-');
 plot(xx, UU(3,:,3)./UU(1,:,3), '^-');
 plot(xx, PP, '.-');
-title(['Ratio = ' num2str(ratio)]);
-legend('\rho', 'u', 'E', 'P', 'Location', 'Best');
+plot(xx, (UU(2,:,3)./UU(1,:,3))./sqrt(gam.*PP./(UU(1,:,3)./g_x)), '--');
+title(['Exit Mach Number:' num2str(M_e)]);
+legend('\rho', 'u', 'E', 'P','Ma', 'Location', 'bestoutside');
 saveas(gcf, [dirName '\' fileName]);
 
 fprintf('Simulation complete!\nNo. of iterations: %i\n', length(res));
