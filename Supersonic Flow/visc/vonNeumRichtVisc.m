@@ -1,12 +1,10 @@
 function varargout = vonNeumRichtVisc(FF, GR, BC, FL, varargin)
 
-<<<<<<< HEAD
 alpha = 0.25;
 alphaMin = 1;
-=======
-alpha = 1.2;
-alphaMin = 0.5;
->>>>>>> Nozzle-Cases
+
+% alpha = 1.2;
+% alphaMin = 0.5;
 power = 1;
 % epsMin = min(GR.dx^2,GR.dy^2);
 DIRnames = {'N', 'S', 'E', 'W'};
