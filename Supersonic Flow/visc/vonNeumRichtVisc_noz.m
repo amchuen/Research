@@ -1,12 +1,7 @@
 function varargout = vonNeumRichtVisc(FF, GR, BC, FL, varargin)
 
-<<<<<<< HEAD
-alpha = 0.25;
-alphaMin = 1;
-=======
-alpha = 1.2;
-alphaMin = 0.5;
->>>>>>> Nozzle-Cases
+alpha = 0;
+alphaMin = 2.5e2;%0.75;%10;
 power = 1;
 % epsMin = min(GR.dx^2,GR.dy^2);
 DIRnames = {'N', 'S', 'E', 'W'};
@@ -49,23 +44,18 @@ function visc = calcVisc(DIR)
     visc(logical(testInd)) = 0;
     switch DIR
         case {'W', 'E'}
-%             visc_min = GR.dx;
-            if GR.dx > GR.dy
-                visc_min = GR.dx*GR.dy;
-            else
-                visc_min = GR.dx^2;
-            end
+            visc_min = max(GR.dx*GR.dy, GR.dx^2);
+%             if GR.dx > GR.dy
+%                 visc_min = GR.dx*GR.dy;
+%             else
+%                 visc_min = GR.dx^2;
+%             end
             
         case {'N', 'S'}
-%             visc_min = GR.dy;
-            if GR.dy > GR.dx
-                visc_min = GR.dx*GR.dy;
-            else
-                visc_min = GR.dx^2;
-            end
+            visc_min = max(GR.dy^2, GR.dx*GR.dy);
     end
-%     visc_min = min(GR.dx, GR.dy);
-    visc = visc + alphaMin*visc_min;
+%     visc = visc + alphaMin*visc_min;
+    visc = 5e-3;
 end
 
 end

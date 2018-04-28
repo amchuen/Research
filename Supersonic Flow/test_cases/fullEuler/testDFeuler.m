@@ -78,7 +78,6 @@ BC.E.varType = BC.N.varType;
 % BC.E.val = {1, x_vals(end)+GR.dx};
 
 %% Run Simulation
-
 GR.ratio = 1;
 U0 = cat(3,repmat(ones(size(GR.XX)),1,1,2), zeros(size(GR.XX)), ones(size(GR.XX))./(FL.gam*(FL.gam-1)*FL.M0^2)+0.5);%cat(3, ones(size(GR.XX)), GR.XX);
 
