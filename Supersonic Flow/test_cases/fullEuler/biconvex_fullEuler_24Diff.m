@@ -61,19 +61,23 @@ BC.N.varType = {'s','v2', 'v1', 's'};
 % BC.N.varName = {'\rho', '\rho u', '\rho v', '\rho\epsilon'};
 BC.N.varName = {'\rho', '\rho u', '\rho v', '\rho e'};
 BC.N.dydx = 0;
+BC.N.range = [1,length(x_vals)];
 
 % Inlet
 BC.W = BC.N;
+BC.W.range = [1,length(y_vals)];
 % BC.W.val = {1, x_vals(1)-GR.dx};
 
 % Wall
 BC.S.physical = 'wall';
 BC.S.varType = BC.N.varType;
+BC.S.range = BC.N.range;
 BC.S.dydx = dyBdx;
 
 % Outlet
 BC.E.physical = 'outlet';
 BC.E.varType = BC.N.varType;
+BC.E.range = BC.W.range;
 % BC.E = BC.N;
 % BC.E.val = {1, x_vals(end)+GR.dx};
 

@@ -62,10 +62,11 @@ d2Ud2 = [zeros(size(EE2(:,1,:))), d2_E - d2_W, zeros(size(EE2(:,end,:)))];
 
 % Compute Viscosities
 incFact = 0.0625;
-eps4_N = max(0,(incFact.*max(C_speed1(3:end,:),C_speed1(2:end-1,:))./8 - 0.25.*eps2_N./(GR.dy)));
-eps4_S = max(0,(incFact.*max(C_speed1(1:end-2,:),C_speed1(2:end-1,:))./8 - 0.25.*eps2_S./(GR.dy)));
-eps4_E = max(0,(incFact.*max(C_speed2(:,3:end),C_speed2(:,2:end-1))./8 - 0.25.*eps2_E./(GR.dx)));
-eps4_W = max(0,(incFact.*max(C_speed2(:,1:end-2),C_speed2(:,2:end-1))./8 - 0.25.*eps2_W./(GR.dx)));
+incEps2 = 1;
+eps4_N = max(0,(incFact.*max(C_speed1(3:end,:),C_speed1(2:end-1,:))./8 - incEps2.*0.25.*eps2_N./(GR.dy)));
+eps4_S = max(0,(incFact.*max(C_speed1(1:end-2,:),C_speed1(2:end-1,:))./8 - incEps2.*0.25.*eps2_S./(GR.dy)));
+eps4_E = max(0,(incFact.*max(C_speed2(:,3:end),C_speed2(:,2:end-1))./8 - incEps2.*0.25.*eps2_E./(GR.dx)));
+eps4_W = max(0,(incFact.*max(C_speed2(:,1:end-2),C_speed2(:,2:end-1))./8 - incEps2.*0.25.*eps2_W./(GR.dx)));
 
 % Compute Dissipation
 D_U4 = (eps4_N.*(d2Ud1(3:end,:,:) - d2Ud1(2:end-1,:,:)) - eps4_S.*(d2Ud1(2:end-1,:,:) - d2Ud1(1:end-2,:,:)))./GR.dy + (eps4_E.*(d2Ud2(:,3:end,:) - d2Ud2(:,2:end-1,:)) - eps4_W.*(d2Ud2(:,2:end-1,:) - d2Ud2(:,1:end-2,:)))./GR.dx;

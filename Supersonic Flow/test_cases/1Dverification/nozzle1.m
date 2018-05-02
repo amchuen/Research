@@ -35,18 +35,21 @@ ylabel('y [inches]')
 
 %% Generate Spline
 
+% Make non-dimensionalized spline-curve function
 Area = 2.*y;
 curve = spline(x./min(Area), Area./min(Area));
 
+% Check against original points
 xEnd = x(end)./min(Area);
 xx = linspace(0,xEnd);
 yy = ppval(curve,xx);
 
 hold on; plot(xx.*min(Area), 0.5.*yy.*min(Area));
 
+% Find the throat location
 func = @(xval) ppval(curve, xval);
-
 options = optimset('TolX', 1e-10);
 xThroat = fminbnd(func, 0, xEnd, options);
 
+% Save results
 save('mcCabe_nozzle.mat', 'curve', 'xThroat', 'xEnd');
