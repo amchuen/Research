@@ -2,7 +2,7 @@ clc;
 clear;
 close all;
 
-dirName = 'twoThroat';
+dirName = 'mcCabe_nozzle';
 
 if ~exist(dirName, 'dir')
     mkdir(dirName);
@@ -11,59 +11,67 @@ end
 addpath(dirName);
 addpath('fluxSchemes\');
 addpath('viscositySchemes\');
+% addpath('../../Matrix Solvers/');
 
-%% Define Grid
+%% Generate Grid
+noz = load('mcCabe_nozzle.mat');
+xx = linspace(noz.xThroat,noz.xEnd,201);%linspace(0.5*(1-sqrt(3)/3),1,201);
+% xx = linspace(0.5,1,201);
+dx = xx(2) - xx(1);
 
-aftThrArea = @(x) pi.*(-sin(10.*pi.*x)./250 + x./100 + 1/100).^2;
-x_vals = linspace(0.05, 0.35, 1001);
-g_x = aftThrArea(x_vals);%./aftThrArea(0.05);
-% x_vals = x_vals ./sqrt(aftThrArea(0.05)/pi);
-dx = x_vals(2) - x_vals(1);
-
-dgdx = [(-1.5.*g_x(1) + 2.*g_x(2) - 0.5*g_x(3))./dx, (g_x(3:end) - g_x(1:end-2))./(2*dx), (0.5*g_x(end-2)-2.*g_x(end-1)+1.5*g_x(end))./dx];
-
-figure();plot(x_vals, g_x);
+visc_x = 0.005;
+% beta = 5e-6;
+ratio_list = 0.9875; %linspace(0.975, 1, 7);% [0.85, 0.9, 0.999, 1];
 tol = 1e-6;
 
+%% Nozzle Geometry
+g_x = ppval(noz.curve, xx);
+% g_x = 1 + (2.*xx-1).^2;
+dgdx = [(-1.5.*g_x(1) + 2.*g_x(2) - 0.5*g_x(3))./dx, (g_x(3:end) - g_x(1:end-2))./(2*dx), (0.5*g_x(end-2)-2.*g_x(end-1)+1.5*g_x(end))./dx];
+
+figure();plot(xx, g_x);
+
 %% Fluid Properties
+% gam_list = 1.4:.1:2;
 gam = 1.4;
 cfl = 1;
 
-%% Define Boundary Conditions
-
+%% Perform Runs
+% Assign Gamma
+%     gam = gam_list(ii);
 ratio = 0.9875;
 dt = dx^2*0.5;
 
-% Throat Conditions
-rho0 = 1;
-u0=1;
+% Initialize Field Values
+% Inlet Conditions -> s0 = 0 (isentropic relations)
+if xx(1) == 0
+    rho0 = (0.5.*(gam+1))^(1/(gam-1));
+    u0 = 0;
+else %if xx(1) == 0.5
+    rho0 = 1;
+    u0 = 1;
+end
 p0 = (rho0^gam)/gam;
-E0 = p0/((gam-1)*rho0) + 0.5*u0^2;
-H0 = (gam/(gam-1))*p0/rho0 + 0.5;
+E0 = p0/((gam-1)*rho0) + 0.5.*u0^2;
+H0 = (gam/(gam-1))*p0/rho0 + 0.5;%3;
 
-% Exit Conditions.... need to nondimensionalize the exit pressure
-dblThrt = load('doubleThroat.mat', 'p_e_ratio');%0.3255;%0.292927099161134;%0.4101;
-p_e = dblThrt.p_e_ratio;
+% Exit Conditions
+M_e = 0.4;
+u_e = sqrt(H0/(0.5+(1/(gam-1))*(1/M_e^2)));
+% p_i = p0.*((1+0.5*(gam-1).*M_e^2)/(1+0.5*(gam-1))).^(-gam/(gam-1));
+p_e = (H0 - 0.5*u_e^2)*(gam-1)/(gam*u_e*g_x(end));
+rho_e = gam*p_e/((gam-1)*(H0-0.5*u_e^2));
+% p_i = 1;
 
-% UU = [rho0; rho0*u0*1.2; rho0*E0].*g_x;
-% UU(2,1) = rho0*u0*g_x(1);
-% UU = repmat(UU,1,1,3);
+UU = [rho0; rho0*u0; rho0*E0].*g_x;
+UU = repmat(UU,1,1,3);
 
-
-oldResults = load('ratio_8.mat', 'UU');
-UU = oldResults.UU;
-% UU(:,1) = [rho0; rho0*u0; rho0*E0].*g_x(1);
-% UU = repmat(UU,1,1,3);
-
-clear oldResults;
-
-%% Setup Time Simulation
-
+% Setup Time Simulation?
 time = 0;
 tEnd = 10*5;
-[flux, Umax, ~, visc_beta] = fx_2Diff(@fluxFunc, @VRvisc, UU(:,:,end), g_x, gam, dx);
+[flux, Umax, ~, visc_beta] = fx_24Diff(@flux_FullEuler, @VRvisc, UU(:,:,end), g_x, gam, dx);
 res = reshape(max(abs(flux), [], 2), 1, size(flux,1));
-% UU_x = UU(:,x_vals==0.65,3);
+UU_x = UU(:,xx==0.65,3);
 dtLast = dt;
 beta = visc_beta.*(dt^2)/(ratio*dx^2);
 
@@ -75,7 +83,15 @@ legend('\rho', 'u', 'e', 'Location', 'BestOutside');
 title('Residual');
 movegui(gcf, 'west');
 
-%% Run Simulation
+% figure(2);
+% [~, PP] = fluxFunc(UU(:,:,end)./g_x, gam);
+% r_x = plot(xx, UU(1,:,3)./g_x, '*-'); hold on;
+% u_x = plot(xx, UU(2,:,3)./UU(1,:,3), 'o-');
+% e_x = plot(xx, UU(3,:,3)./UU(1,:,3), 'o-');
+% p_x = plot(xx, PP, '^-');
+% title(['Ratio = ' num2str(ratio)]);
+% legend('\rho', 'u', '\epsilon', 'P', 'Location', 'BestOutside');
+
 while length(time) < 3 || norm(res(end,:)) > tol
 
    % Update Field Values and boundary conditions
@@ -97,11 +113,10 @@ while length(time) < 3 || norm(res(end,:)) > tol
 
     % Update Outflow Boundary Condition
     % 1) Extrapolate rho and E
-%     UU(:,end,2:3) = (5/2.*UU(:,end-1,2:3) - 2.*UU(:,end-2,2:3) + 0.5.*UU(:,end-3,2:3)); % - 1/3.*UU(:,end-2,2:3);
-%     UU(:,end,2:3) = (2.*UU(:,end-1,2:3)./g_x(end-1) - UU(:,end-2,2:3)./g_x(end-2)).*g_x(end);
-    UU(:,end,2:3) = (2.*UU(:,end-1,2:3) - UU(:,end-2,2:3));
-%     UU(:,end,2:3) = UU(:,end-1,2:3);
-%     UU(:,end,2:3) = 4/3.*UU(:,end-1,2:3) - (1/3).*UU(:,end-2,2:3);
+%     UU(:,end,2:3) = (5/2.*UU(:,end-1,2:3)./g_x(end-1) - 2.*UU(:,end-2,2:3)./g_x(end-2) + 0.5.*UU(:,end-3,2:3)./g_x(end-3)).*g_x(end); % - 1/3.*UU(:,end-2,2:3);
+    UU(:,end,2:3) = (5/2.*UU(:,end-1,2:3) - 2.*UU(:,end-2,2:3) + 0.5.*UU(:,end-3,2:3)); % - 1/3.*UU(:,end-2,2:3);
+%     UU(:,end,2:3) = (4/3.*UU(:,end-1,2:3) - 1/3.*UU(:,end-2,2:3)); % - 1/3.*UU(:,end-2,2:3);
+%     UU(:,end,2:3) = (2.*UU(:,end-1,2:3) - UU(:,end-2,2:3));%.*g_x(end);
 
     % 2) Fix End Condition
 %     p_i = (UU(1,end,2:3).*H0./(g_x(end)*gam))./(0.5*M_e^2+1/(gam-1));
@@ -112,7 +127,7 @@ while length(time) < 3 || norm(res(end,:)) > tol
 %     UU(2,end,2:3) = UU(1,end,2:3).*u_e;
 
     % Update Flux and Pressure
-    [flux, Umax, ~, visc_beta] = fx_2Diff(@fluxFunc, @VRvisc, UU(:,:,end), g_x, gam, dx);
+    [flux, Umax, ~, visc_beta] = fx_24Diff(@flux_FullEuler, @VRvisc, UU(:,:,end), g_x, gam, dx);
     res(end+1,:) = reshape(max(abs(flux), [], 2), 1, size(flux,1));
 
     % Plot Residuals
@@ -129,7 +144,7 @@ while length(time) < 3 || norm(res(end,:)) > tol
 end
 
 %% Post Process
-ii=9;
+% ii=3;
 fileName = ['ratio_' num2str(ii)];
 save([dirName '\' fileName]);
 
@@ -140,14 +155,13 @@ saveas(gcf, [dirName '\resFig_' fileName]);
 % saveas(gcf, [dirName '\oscFig_' fileName]);
 
 figure();
-[~, PP] = fluxFunc(UU(:,:,end)./g_x, gam);
-plot(x_vals, UU(1,:,3)./g_x, '*-'); hold on;
-plot(x_vals, UU(2,:,3)./UU(1,:,3), 'o-');
-plot(x_vals, UU(3,:,3)./UU(1,:,3), '^-');
-plot(x_vals, PP, '.-');
-% plot(x_vals, (UU(2,:,3)./UU(1,:,3))./sqrt(gam.*PP./(UU(1,:,3)./g_x)), '--');
-plot(x_vals, 1./sqrt((H0./(UU(2,:,3)./UU(1,:,3)).^2 - 0.5)*(gam-1)), '--');
-% title(['Exit Mach Number:' num2str(M_e)]);
+[~, PP] = flux_FullEuler(UU(:,:,end)./g_x, gam);
+plot(xx, UU(1,:,3)./g_x, '*-'); hold on;
+plot(xx, UU(2,:,3)./UU(1,:,3), 'o-');
+plot(xx, UU(3,:,3)./UU(1,:,3), '^-');
+plot(xx, PP, '.-');
+plot(xx, (UU(2,:,3)./UU(1,:,3))./sqrt(gam.*PP./(UU(1,:,3)./g_x)), '--');
+title(['Exit Mach Number:' num2str(M_e)]);
 legend('\rho', 'u', 'E', 'P','Ma', 'Location', 'bestoutside');
 saveas(gcf, [dirName '\' fileName]);
 

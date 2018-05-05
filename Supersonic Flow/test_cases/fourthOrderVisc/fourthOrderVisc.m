@@ -8,7 +8,7 @@ xx = linspace(-1,1, 201);
 dx = xx(2) - xx(1);
 dt = 0.4*dx;
 dtLast = dt;
-cfl = 0.5;
+cfl = 1;
 
 UU = zeros(size(xx));
 UU(xx <= 0) = 1;
@@ -26,7 +26,8 @@ UU = repmat(UU,3,1);
 %% Time Step
 
 tol = 1e-6;
-res = norm(max(abs(fluxFunc(UU(end,:),dx))));
+flux = fluxFunc(UU(end,:),dx);
+res = norm(max(abs(flux)));
 
 figure(1);
 resPlot = semilogy(res);
@@ -57,10 +58,11 @@ while res(end) > tol
 %     UU(3,2:end-1) = UU(2,2:end-1) - dt.*fluxFunc(UU(2,:),dx);
 %     beta = 4.*visc_x*(dt^2)/(ratio*dx^2);
     beta = 0.5.*(VRvisc(UU(3,2:end),dx)+VRvisc(UU(3,1:end-1),dx)).*(dt/dx)^2;
-    UU(3,2:end-1) = ((2.*beta./(dt^2)).*UU(2,2:end-1)-(beta./(dt^2)-0.5./dt).*UU(1,2:end-1)-fluxFunc(UU(2,:),dx))./(beta./(dt^2)+0.5/dt);
+    UU(3,2:end-1) = ((2.*beta./(dt^2)).*UU(2,2:end-1)-(beta./(dt^2)-0.5./dt).*UU(1,2:end-1)-flux)./(beta./(dt^2)+0.5/dt);
     
     % Update Residuals
-    res(end+1) = norm(max(abs(fluxFunc(UU(3,:),dx))));
+    flux = fluxFunc(UU(3,:),dx);
+    res(end+1) = norm(max(abs(flux)));
     resPlot.YData(end+1) = res(end);
     Ux.YData = UU(3,:);
     drawnow;

@@ -20,9 +20,9 @@ visc2_W = VRvisc(U(1:end-1),dx);
 % end
 
 % Calculate Fourth-Order Visc
-incFact = 0.5;
-visc4_E = (incFact.*abs(C_speed).*(dx^3)./8 - 0.25.*visc2_E.*dx^2)./(dx^3);
-visc4_W = (incFact.*abs(C_speed).*(dx^3)./8 - 0.25.*visc2_W.*dx^2)./(dx^3);
+inc4 = 0.25;
+visc4_E = (inc4.*abs(C_speed)./8 - 0.25.*visc2_E./dx);
+visc4_W = (inc4.*abs(C_speed)./8 - 0.25.*visc2_W./dx);
 
 visc4_E = max(0,visc4_E);
 visc4_W = max(0,visc4_W);
