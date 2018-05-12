@@ -12,7 +12,7 @@ x_vals = linspace(xThroat, 1, 201);
 dx = x_vals(2) - x_vals(1);
 
 % Extend x for exit region
-x_vals = [x_vals, (x_vals(end)+(dx:dx:0.3))];
+% x_vals = [x_vals, (x_vals(end)+(dx:dx:0.3))];
 
 dy = 0.005;
 
@@ -87,18 +87,18 @@ BC.S.varName = BC.N.varName;
 BC.S.dydx = dyBdx;
 BC.S.range = [1, find(x_vals==1,1,'last')];
 
-% % Exit Region
-BC.S(2).physical = 'smallDisturb';
-BC.S(2).varType = BC.N.varType;
-BC.S(2).varName = BC.N.varName;
-BC.S(2).perturbPrim = cat(3, zeros(size(x_vals)), -1.5.*ones(size(x_vals)), repmat(zeros(size(x_vals)),1,1,2));
-BC.S(2).range = [find(x_vals == 1,1,'last')+1, length(x_vals)];
+% % % Exit Region
+% BC.S(2).physical = 'smallDisturb';
+% BC.S(2).varType = BC.N.varType;
+% BC.S(2).varName = BC.N.varName;
+% BC.S(2).perturbPrim = cat(3, zeros(size(x_vals)), -1.5.*ones(size(x_vals)), repmat(zeros(size(x_vals)),1,1,2));
+% BC.S(2).range = [find(x_vals == 1,1,'last')+1, length(x_vals)];
 
 % Outlet
 M_e = 1.25;
 p_i = p0.*((1+0.5*(FL.gam-1).*M_e^2)/(1+0.5*(FL.gam-1))).^(-FL.gam/(FL.gam-1));
 BC.E.physical = 'outlet';
-% BC.E.exitCond = {'p', p_i};
+BC.E.exitCond = {'p', p_i};
 BC.E.varType = BC.N.varType;
 BC.E.varName = BC.N.varName;
 BC.E.range = [1, find(y_vals == y_vals(end))];

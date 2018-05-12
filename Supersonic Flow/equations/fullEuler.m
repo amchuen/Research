@@ -1,10 +1,10 @@
 function [FF, GG, PP, varargout] = fullEuler(GR, FL, BC, EE)
 
 % Get Indexing
-indP1 = reshape(strcmp(BC.N.varType, 'v1'),1,1,size(EE,3));
-indP2 = reshape(strcmp(BC.N.varType, 'v2'),1,1,size(EE,3));
-indRho = reshape(strcmp(BC.N.varName, '\rho'),1,1,size(EE,3));
-indE = reshape(strcmp(BC.N.varName, '\rho e'),1,1,size(EE,3));
+indP1 = reshape(strcmpi(BC.N.varType, 'v1'),1,1,size(EE,3));
+indP2 = reshape(strcmpi(BC.N.varType, 'v2'),1,1,size(EE,3));
+indRho = reshape(strcmpi(BC.N.varName, '\rho'),1,1,size(EE,3));
+indE = reshape(strcmpi(BC.N.varName, '\rho e'),1,1,size(EE,3));
 
 % Pressure Calculation
 PP = (FL.gam-1).*(EE(:,:,indE)-0.5.*(EE(:,:,indP1).^2 + EE(:,:,indP2).^2)./EE(:,:,indRho));

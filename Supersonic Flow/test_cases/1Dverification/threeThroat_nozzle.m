@@ -2,7 +2,7 @@ clc;
 clear;
 close all;
 
-dirName = 'twoThroat';
+dirName = 'threeThroat';
 
 if ~exist(dirName, 'dir')
     mkdir(dirName);
@@ -15,7 +15,7 @@ addpath('viscositySchemes\');
 %% Define Grid
 
 aftThrArea = @(x) pi.*(-sin(10.*pi.*x)./250 + x./100 + 1/100).^2;
-x_vals = linspace(0.05, 0.35, 1001);
+x_vals = linspace(0.05, 0.55, 1001);
 g_x = aftThrArea(x_vals);%./aftThrArea(0.05);
 % x_vals = x_vals ./sqrt(aftThrArea(0.05)/pi);
 dx = x_vals(2) - x_vals(1);
@@ -42,19 +42,23 @@ E0 = p0/((gam-1)*rho0) + 0.5*u0^2;
 H0 = (gam/(gam-1))*p0/rho0 + 0.5;
 
 % Exit Conditions.... need to nondimensionalize the exit pressure
-% dblThrt = load('doubleThroat.mat', 'p_e_ratio');%0.3255;%0.292927099161134;%0.4101;
-% p_e = dblThrt.p_e_ratio;
+trplThrt = load('tripleThroat.mat', 'p_e_ratio');%0.3255;%0.292927099161134;%0.4101;
+p_e = 1*trplThrt.p_e_ratio;
 
-UU = [rho0; rho0*u0*2; rho0*E0].*g_x;
+% UU0 = [rho0*0.25; 1*rho0*u0; rho0*E0].*g_x;
 % UU(2,1) = rho0*u0*g_x(1);
 % UU(1,1) = rho0*g_x(1);
 % UU = repmat(UU,1,1,3);
 
 
-% oldResults = load('ratio_8.mat', 'UU');
-% UU = oldResults.UU;
-UU(:,1) = [rho0; rho0*u0; rho0*E0].*g_x(1);
-UU = repmat(UU,1,1,3);
+oldResults1 = load('threeShock.mat', 'UU');
+oldResults2 = load('oneShock.mat', 'UU');
+UU = oldResults2.UU;
+UU(:,x_vals<=0.15,:) = oldResults1.UU(:,x_vals<=0.15,:);
+
+% UU = oldResults1.UU;
+% UU0(:,1) = [rho0; rho0*u0; rho0*E0].*g_x(1);
+% UU = repmat(UU0,1,1,3);
 
 % clear oldResults;
 
@@ -98,18 +102,18 @@ while length(time) < 3 || norm(res(end,:)) > tol
 
     % Update Outflow Boundary Condition
     % 1) Extrapolate rho and E
-    UU(:,end,2:3) = (5/2.*UU(:,end-1,2:3) - 2.*UU(:,end-2,2:3) + 0.5.*UU(:,end-3,2:3)); % - 1/3.*UU(:,end-2,2:3);
+%     UU(:,end,2:3) = (5/2.*UU(:,end-1,2:3) - 2.*UU(:,end-2,2:3) + 0.5.*UU(:,end-3,2:3)); % - 1/3.*UU(:,end-2,2:3);
 %     UU(:,end,2:3) = (2.*UU(:,end-1,2:3)./g_x(end-1) - UU(:,end-2,2:3)./g_x(end-2)).*g_x(end);
 %     UU(:,end,2:3) = (2.*UU(:,end-1,2:3) - UU(:,end-2,2:3));
 %     UU(:,end,2:3) = UU(:,end-1,2:3);
-%     UU(:,end,2:3) = 4/3.*UU(:,end-1,2:3) - (1/3).*UU(:,end-2,2:3);
+    UU(:,end,2:3) = 4/3.*UU(:,end-1,2:3) - (1/3).*UU(:,end-2,2:3);
 
     % 2) Fix End Condition
 %     p_i = (UU(1,end,2:3).*H0./(g_x(end)*gam))./(0.5*M_e^2+1/(gam-1));
 %     UU(1,end,2:3) = rho_e*g_x(end);
 %     UU(2,end,2:3) = rho_e*u_e*g_x(end);
 %     UU(3,end,2:3) = (p_e/(gam-1) + 0.5.*rho_e.*u_e^2).*g_x(end);
-%     UU(3,end,2:3) = (p_e*g_x(end)/(gam-1) + 0.5.*(UU(2,end,2:3).^2)./UU(1,end,2:3));
+    UU(3,end,2:3) = (p_e*g_x(end)/(gam-1) + 0.5.*(UU(2,end,2:3).^2)./UU(1,end,2:3));
 %     UU(2,end,2:3) = UU(1,end,2:3).*u_e;
 
     % Update Flux and Pressure
@@ -130,8 +134,8 @@ while length(time) < 3 || norm(res(end,:)) > tol
 end
 
 %% Post Process
-ii=12;
-fileName = ['ratio_' num2str(ii)];
+ii=1;
+fileName = 'twoShock_2';%['ratio_' num2str(ii)];
 save([dirName '\' fileName]);
 
 figure(1);
@@ -151,6 +155,12 @@ plot(x_vals, 1./sqrt((H0./(UU(2,:,3)./UU(1,:,3)).^2 - 0.5)*(gam-1)), '--');
 % title(['Exit Mach Number:' num2str(M_e)]);
 legend('\rho', 'u', 'E', 'P','Ma', 'Location', 'bestoutside');
 saveas(gcf, [dirName '\' fileName]);
+
+figure();
+% plot(x_vals, (UU(2,:,3)./UU(1,:,3))./sqrt(gam.*PP./(UU(1,:,3)./g_x)));
+plot(x_vals, 1./sqrt((H0./(UU(2,:,3)./UU(1,:,3)).^2 - 0.5)*(gam-1)));
+title('Mach Number - One Shock Solution');
+saveas(gcf, [dirName '\machNum_' fileName]);
 
 fprintf('Simulation complete!\nNo. of iterations: %i\n', length(res));
 if norm(res(end)) < tol

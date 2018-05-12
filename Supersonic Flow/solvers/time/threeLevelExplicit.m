@@ -72,13 +72,25 @@ while norm(res(end,:)./maxRes) > GR.tol || time(end) < GR.tEnd
     if (length(res) >= 500) && (mod(length(res), 500) == 0)
         fprintf('Iteration Ct: %i\n', length(res));
         fprintf('Current Residual: %0.5e\n', norm(res(end,:)));
+        % Plot Residuals
+        for iii = 1:size(res,2)
+            resPlot(iii).YData = res(:,iii);
+        end
+        figure(2); 
+        for i = 1:size(UU,3)
+            if i ==1
+            plot(GR.XX(1,:), UU(end,:,i,end));
+            else
+            plot(GR.XX(1,:), UU(end,:,i,end)./UU(end,:,1,end));
+            end
+            hold on;
+        end
+        plot(GR.XX(1,:), (FL.gam-1).*(UU(end,:,end,end) - 0.5.*(sum(UU(end,:,2:3,end),3).^2)./UU(end,:,1,end)))
+        legend('\rho', 'u', 'v', 'E','P', 'Location', 'bestoutside')
+        hold off;
+        drawnow;
     end
     
-    % Plot Residuals
-    for iii = 1:size(res,2)
-        resPlot(iii).YData(end+1) = res(end,iii);
-    end
-    drawnow;
     
     if size(res,1) < 5
         maxRes = max(res, [], 1);

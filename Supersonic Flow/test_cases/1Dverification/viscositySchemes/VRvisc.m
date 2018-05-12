@@ -1,6 +1,6 @@
 function epsilon = VRvisc(U, dx)
 
-visc = 0;
+visc = 0.15;
 visc_ss = 0.5*dx;
 % visc_ss = 0.001;
 

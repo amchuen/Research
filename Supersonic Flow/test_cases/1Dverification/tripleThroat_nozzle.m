@@ -9,12 +9,12 @@ M_air = 28.9647/1000; % kg/mol
 %% Declare Inputs
 
 % Inlet Conditions
-P_i = 50e3; % pascals
+P_i = 60e3; % pascals
 T_i = 368.16; %K
 u_i = 5.42; %m/s
 
 % Exit Conditions
-P_e = 15e3; % Pascals
+P_e = 20e3; % Pascals
 
 % Nozzle Geometry functions
 aftThrArea = @(x) pi.*(-sin(10.*pi.*x)./250 + x./100 + 1/100).^2;
@@ -60,7 +60,7 @@ P_T_total = P_T*(1+0.5*(gam-1))^(gam/(gam-1));
 %% Calculate Exit Conditions
 
 % Calculate Exit mach Number
-AR_exit = aftThrArea(0.35)/aftThrArea(0.05);
+AR_exit = aftThrArea(0.55)/aftThrArea(0.05);
 func = @(M) (1./M).*((2/(gam+1)).*(1+0.5.*(gam-1).*M.^2)).^((gam+1)/(2*(gam-1))) - AR_exit;
 jFunc = @(M) (2.*(M.^2-1).*(((gam-1).*M.^2+1)./(gam+1)).^(1/(gam-1) - 0.5))./((gam+1).*M.^2);
 M_e = newtonSys(func, jFunc, 1.6, tol, tol, 1e5, 1);
@@ -95,4 +95,4 @@ fprintf('Throat Density: %0.3f kg/m^3\n', rho_T);
 fprintf('Throat Temperature: %0.3f K\n', T_T);
 fprintf('Throat Mass Flow: %0.3f kg/s\n', m_T);
 
-save('doubleThroat', 'p_e_ratio', 'aftThrArea');
+save('tripleThroat', 'p_e_ratio', 'aftThrArea');

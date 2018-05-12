@@ -1,4 +1,4 @@
-function varargout = vonNeumRichtVisc(FF, GR, BC, FL, varargin)
+function varargout = vonNeumRichtVisc_noz(FF, GR, BC, FL, varargin)
 
 alpha = 0;
 alphaMin = 2.5e2;%0.75;%10;
