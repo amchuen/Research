@@ -3,19 +3,17 @@ close all;
 clear;
 
 %% GR - grid information, such as the meshfield, grid spacing (dx, dy, etc.)
-noz = load('doubleThroat.mat');
-% noz = load('tripleThroat.mat');
+noz = load('tripleThroat.mat');
 % Define Nozzle Region
 xThroat = 0.05;
-xEnd = 0.35;
-% xEnd = 0.55;
+xEnd = 0.55;
 channel_width = noz.aftThrArea(xThroat);
 func = @(x) 0.5.*noz.aftThrArea(x)./channel_width;
-x_vals = linspace(xThroat, xEnd, 5001)./channel_width;
+x_vals = linspace(xThroat, xEnd, 9001)./channel_width;
 dx = x_vals(2) - x_vals(1);
 
-y_max = 10*max(func(x_vals.*channel_width));
-y_vals = linspace(0,y_max, 51);
+y_max = max(func(x_vals.*channel_width));
+y_vals = linspace(0,y_max, 11);
 dy = y_vals(2) - y_vals(1);
 
 g_x = -func(x_vals.*channel_width) ;
@@ -28,7 +26,7 @@ GR.dy = dy;
 GR.isPolar = 0;
 
 %% FL - fluid parameters
-FL.gam = 2; % heat 
+FL.gam = 1.4; % heat 
 FL.M0 = 1.0;
 
 rho0 = 1;
@@ -56,8 +54,8 @@ GR.CFL = 1;
 % Far-field... need to update this?
 BC.N.physical = 'sym';
 BC.N.val = GR.YY(end,:);
-BC.N.varType = {'s','v2', 'v1'};%, 's'};
-BC.N.varName = {'\rho', '\rho u', '\rho v'};%, '\rho e'};
+BC.N.varType = {'s','v2', 'v1', 's'};
+BC.N.varName = {'\rho', '\rho u', '\rho v', '\rho e'};
 BC.N.dydx = 0;
 BC.N.range = [1, find(x_vals==x_vals(end))];
 
@@ -65,7 +63,7 @@ BC.N.range = [1, find(x_vals==x_vals(end))];
 BC.W.varType = BC.N.varType;
 BC.W.varName = BC.N.varName;
 BC.W.physical = 'inlet';
-BC.W.val = {rho0, rho0*u0, rho0*v0};%, rho0.*E0};
+BC.W.val = {rho0, rho0*u0, rho0*v0, rho0.*E0};
 BC.W.range = [1, find(y_vals == y_vals(end))];
 
 % Nozzle
@@ -87,8 +85,8 @@ BC.S.range = [1, length(x_vals)];
 
 % Outlet
 BC.E.physical = 'outlet';
-BC.E.exitCond = {'p', noz.p_e_ratio};
-% BC.E.exitCond = {'u', noz.u_1};
+% BC.E.exitCond = {'p', noz.p_e_ratio};
+BC.E.exitCond = {'u', noz.u_1};
 BC.E.varType = BC.N.varType;
 BC.E.varName = BC.N.varName;
 BC.E.range = [1, find(y_vals == y_vals(end))];
@@ -97,27 +95,24 @@ BC.E.range = [1, find(y_vals == y_vals(end))];
 GR.ratio = 1;
 % oldResults = load('nonUnique_nozzle\M_1\OUT.mat');
 % U0 = oldResults.OUT.Uvals(:,:,:,end);
-% U0 = cat(3, rho0.*ones(size(GR.XX)), 1.75*rho0.*u0.*ones(size(GR.XX)), v0.*ones(size(GR.XX)), ((rho0.^FL.gam)./(FL.gam*(FL.gam-1))+0.5.*(rho0.*(u0)^2)).*ones(size(GR.XX)));%cat(3, ones(size(GR.XX)), GR.XX);
-U0 = cat(3, rho0.*ones(size(GR.XX)), rho0.*u0.*ones(size(GR.XX)), v0.*ones(size(GR.XX)));%, ((rho0.^FL.gam)./(FL.gam*(FL.gam-1))+0.5.*(rho0.*(u0)^2)).*ones(size(GR.XX)));%cat(3, ones(size(GR.XX)), GR.XX);
+U0 = cat(3, rho0.*ones(size(GR.XX)), 1.75*rho0.*u0.*ones(size(GR.XX)), v0.*ones(size(GR.XX)), ((rho0.^FL.gam)./(FL.gam*(FL.gam-1))+0.5.*(rho0.*(u0)^2)).*ones(size(GR.XX)));%cat(3, ones(size(GR.XX)), GR.XX);
 
-% fluxFunc = @(GR, FL, BC, EE) fluxCD_2Diff(@fullEuler, @vonNeumRichtVisc, GR, FL, BC, EE);
-fluxFunc = @(GR, FL, BC, EE) fluxCD_2Diff(@isentropicEuler, @vonNeumRichtVisc, GR, FL, BC, EE);
+fluxFunc = @(GR, FL, BC, EE) fluxCD_2Diff(@fullEuler, @vonNeumRichtVisc, GR, FL, BC, EE);
 OUT = threeLevelExplicit(GR, FL, BC, U0, fluxFunc);
 
 %% Post Process
 close all;
 
-BC.N.varName = {'\rho', '\rho u', '\rho v'};
+BC.N.varName = {'\rho', '\rho u', '\rho v', '\rho E'};
 
-geomName = 'twoThroatWater';
+geomName = 'three_throat';
 % geomName = 'twoShock';
 resultName = 'oneExitShock';
 % folderName = ['M_' num2str(FL.M0)];
-dirName = [pwd '\' geomName '\' resultName];
+dirName = [pwd '\' geomName '\' resultName '\'];
 % if ~exist(dirName, 'dir')
 %     mkdir(dirName);
 % end
 
-clear noz;
 postProcessHalfNozzle(GR, BC, FL, OUT, dirName, @fullEuler);
 save([dirName 'OUT']);

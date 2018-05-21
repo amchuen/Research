@@ -95,4 +95,4 @@ fprintf('Throat Density: %0.3f kg/m^3\n', rho_T);
 fprintf('Throat Temperature: %0.3f K\n', T_T);
 fprintf('Throat Mass Flow: %0.3f kg/s\n', m_T);
 
-save('tripleThroat', 'p_e_ratio', 'aftThrArea');
+save('tripleThroat', 'p_e_ratio', 'aftThrArea', 'u_1');

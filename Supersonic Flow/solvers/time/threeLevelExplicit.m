@@ -72,7 +72,7 @@ while norm(res(end,:)./maxRes) > GR.tol || time(end) < GR.tEnd
     if (length(res) >= 500) && (mod(length(res), 500) == 0)
         fprintf('Iteration Ct: %i\n', length(res));
         fprintf('Current Residual: %0.5e\n', norm(res(end,:)));
-        % Plot Residuals
+        % Plot Center-line results (for nozzle)
         for iii = 1:size(res,2)
             resPlot(iii).YData = res(:,iii);
         end
@@ -85,7 +85,8 @@ while norm(res(end,:)./maxRes) > GR.tol || time(end) < GR.tEnd
             end
             hold on;
         end
-        plot(GR.XX(1,:), (FL.gam-1).*(UU(end,:,end,end) - 0.5.*(sum(UU(end,:,2:3,end),3).^2)./UU(end,:,1,end)))
+        [~, ~, ~, ~, ~, PP] = fluxFunc(GR, FL, BC, UU(:,:,:,3));
+        plot(GR.XX(1,:), PP(end,:));
         legend('\rho', 'u', 'v', 'E','P', 'Location', 'bestoutside')
         hold off;
         drawnow;

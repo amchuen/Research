@@ -135,6 +135,8 @@ function BC_vals = gen_outletBC(GR, FL, BC, FF, DIR,ind)
 
                     elseif any(strcmp(BC.(DIR)(ind).varName, '\rho u')) % isentropic euler case
 %                         indRho = reshape(strcmp(BC.(DIR)(ind).varName, '\rho'),1,1,size(FF,3));
+                        BC_vals(:,:,indV2) = BC_vals(:,:,indV2).*((FL.gam.*FL.M0.*BC.(DIR)(ind).exitCond{2}).^(1/FL.gam))./BC_vals(:,:,indRho);
+                        BC_vals(:,:,indV1) = BC_vals(:,:,indV1).*((FL.gam.*FL.M0.*BC.(DIR)(ind).exitCond{2}).^(1/FL.gam))./BC_vals(:,:,indRho);
                         BC_vals(:,:,indRho) = ((FL.gam.*FL.M0.*BC.(DIR)(ind).exitCond{2}).^(1/FL.gam));
                     end
 
@@ -142,6 +144,10 @@ function BC_vals = gen_outletBC(GR, FL, BC, FF, DIR,ind)
                     if any(strcmp(BC.(DIR)(ind).varName, '\rho e')) % full Euler case
                         BC_vals(:,:,indE) = BC_vals(:,:,indE) - 0.5.*(BC_vals(:,:,indV2).^2)./BC_vals(:,:,indRho) + 0.5.*BC_vals(:,:,indRho).*(BC.(DIR)(ind).exitCond{2}.^2);
                         BC_vals(:,:,indV2) = BC_vals(:,:,indRho).*BC.(DIR)(ind).exitCond{2};
+                        
+                    elseif any(strcmp(BC.(DIR)(ind).varName, '\rho u')) % isentropic euler case
+                        BC_vals(:,:,indV2) = BC_vals(:,:,indRho).*BC.(DIR)(ind).exitCond{2};
+                        
                     end
                 end
                 

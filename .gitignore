@@ -115,3 +115,6 @@ Supersonic Flow/equations/fullPotential/bodyOffGrid/dufortFrankel.m
 Supersonic Flow/equations/fullPotential/bodyOffGrid/testDFfunc.m
 Supersonic Flow/visc/varViscDocumentation.blg
 Supersonic Flow/visc/varViscDocumentation.out
+*.f90
+*.mod
+*.exe

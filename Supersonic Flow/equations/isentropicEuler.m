@@ -1,4 +1,4 @@
-function [FF, GG, PP] = isentropicEuler(GR, FL, BC, EE)
+function [FF, GG, PP, varargout] = isentropicEuler(GR, FL, BC, EE)
 
 % Get Indexing
 indP1 = reshape(strcmp(BC.N.varType, 'v1'),1,1,size(EE,3));
@@ -18,4 +18,11 @@ FF =    indRho.*EEx(:,:,indP2)...
 GG =    indRho.*EEy(:,:,indP1)...
         + indP1.*(EEy(:,:,indP1).^2./EEy(:,:,indRho) + (EEy(:,:,indRho).^FL.gam)./(FL.gam.*FL.M0^2))...
         + indP2.*(EEy(:,:,indP1).*EEy(:,:,indP2)./EEy(:,:,indRho));
+    
+% More Pressure Terms for JST Scheme
+PP2 = (EEx(:,:,indRho).^FL.gam)./(FL.gam .* FL.M0.^2);
+PP1 = (EEy(:,:,indRho).^FL.gam)./(FL.gam .* FL.M0.^2);
+
+varargout{1} = PP1;
+varargout{2} = PP2;
 end

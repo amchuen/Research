@@ -56,5 +56,6 @@ varargout{2} = waveSpd;
 varargout{3} = V_C;
 varargout{4} = 0.5.*(epsN+epsS);
 varargout{5} = 0.5.*(epsW+epsE);
+varargout{6} = PP;
 
 end
